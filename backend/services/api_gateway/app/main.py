@@ -27,6 +27,7 @@ from services.api_gateway.app.auth import (
     current_principal,
     issue_token,
 )
+from services.api_gateway.app.cube_router import router as cube_router
 from services.api_gateway.app.datasets_router import router as datasets_router
 from services.api_gateway.app.edges_router import router as edges_router
 from services.api_gateway.app.settings import get_settings
@@ -34,11 +35,11 @@ from services.api_gateway.app.uploads import router as uploads_router
 
 app = FastAPI(
     title="Insights Navigator V2.0 — API Gateway",
-    version="0.4.0",
+    version="0.5.0",
     description=(
-        "Phase 4 — knowledge graph: edge proposals via BQ key-overlap, "
-        "admin approve/reject UX, NetworkX-backed path queries. "
-        "See PRD.md and docs/PHASE-4-STATUS.md."
+        "Phase 5 — Cube schema auto-generation: approved graph edges + "
+        "dataset profiles → Cube .js schemas at /v1/cube/schemas. "
+        "See PRD.md and docs/PHASE-5-STATUS.md."
     ),
 )
 
@@ -130,3 +131,4 @@ def me(principal: Principal = Depends(current_principal)) -> Principal:
 app.include_router(datasets_router)
 app.include_router(uploads_router)
 app.include_router(edges_router)
+app.include_router(cube_router)

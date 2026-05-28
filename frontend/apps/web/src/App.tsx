@@ -18,6 +18,7 @@ import {
 } from "@insnav/locale";
 import { DatasetsView } from "./views/DatasetsView";
 import { GraphView } from "./views/GraphView";
+import { CubeView } from "./views/CubeView";
 
 interface AppProps {
   brand: BrandConfig;
@@ -25,7 +26,7 @@ interface AppProps {
 
 const DEMO_VALUE = 12_400_000;
 
-type Tab = "datasets" | "graph" | "demo";
+type Tab = "datasets" | "graph" | "cube" | "demo";
 
 export function App({ brand }: AppProps) {
   const auth = useAuth();
@@ -70,6 +71,7 @@ function AuthedShell({ brand }: { brand: BrandConfig }) {
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         {tab === "datasets" && <DatasetsView />}
         {tab === "graph" && <GraphView />}
+        {tab === "cube" && <CubeView />}
         {tab === "demo" && <LocaleDemoView brand={brand} />}
       </main>
     </div>
@@ -80,6 +82,7 @@ function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "datasets", label: "Datasets" },
     { id: "graph", label: "Graph" },
+    { id: "cube", label: "Cube" },
     { id: "demo", label: "Locale demo" },
   ];
   return (

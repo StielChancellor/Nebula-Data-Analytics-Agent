@@ -166,6 +166,84 @@ export class ApiClient {
   discoverEdges(datasetId: string): Promise<GraphEdge[]> {
     return this.post(`/v1/datasets/${datasetId}/discover-edges`, {});
   }
+
+  // --- Cube schemas (Phase 5) ---
+  listCubeSchemas(): Promise<CubeSchemaSummary[]> {
+    return this.get("/v1/cube/schemas");
+  }
+
+  getCubeSchemaJson(datasetId: string): Promise<CubeSchemaFull> {
+    return this.get(`/v1/cube/schemas/${datasetId}/json`);
+  }
+
+  /** Returns raw Cube .js text (Content-Type: application/javascript) */
+  async getCubeSchemaJs(datasetId: string): Promise<string> {
+    const headers = await this.authHeaders();
+    const res = await fetch(`${this.baseUrl}/v1/cube/schemas/${datasetId}.js`, {
+      headers,
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error(`GET cube/.js -> ${res.status}`);
+    return res.text();
+  }
+}
+
+// --- Cube types (Phase 5) ---
+
+export type CubeRelationship = "one_to_one" | "one_to_many" | "many_to_one" | "many_to_many";
+export type CubeColumnType = "string" | "number" | "time" | "boolean";
+export type CubeMeasureType = "count" | "sum" | "avg" | "min" | "max" | "count_distinct";
+
+export interface CubeSchemaSummary {
+  dataset_id: string;
+  dataset_label: string;
+  cube_name: string;
+  bq_table: string | null;
+  dimension_count: number;
+  measure_count: number;
+  join_count: number;
+  revenue_touching: boolean;
+}
+
+export interface CubeDimension {
+  name: string;
+  sql: string;
+  type: CubeColumnType;
+  primary_key: boolean;
+  title: string | null;
+  description: string | null;
+}
+
+export interface CubeMeasure {
+  name: string;
+  type: CubeMeasureType;
+  sql: string | null;
+  title: string | null;
+  description: string | null;
+  revenue_touching: boolean;
+}
+
+export interface CubeJoin {
+  to_cube: string;
+  sql_clause: string;
+  relationship: CubeRelationship;
+  from_edge_id: string;
+  from_dataset_id: string;
+  to_dataset_id: string;
+}
+
+export interface CubeSchemaFull {
+  name: string;
+  title: string;
+  sql_table: string;
+  description: string;
+  dimensions: CubeDimension[];
+  measures: CubeMeasure[];
+  joins: CubeJoin[];
+  dataset_id: string;
+  tenant_id: string;
+  generated_at: string;
+  locale_hint: "US" | "IN";
 }
 
 /**
