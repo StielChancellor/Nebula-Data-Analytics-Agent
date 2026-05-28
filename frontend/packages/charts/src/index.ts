@@ -1,22 +1,25 @@
 /**
  * @insnav/charts
  *
- * Smart chart-type auto-selection + ECharts adapters. Rule-based on result
- * shape (PRD § Features lifted from Metabase). LLM proposes only when rules tie.
+ * Smart chart-type auto-selection + Unovis adapters.
  *
- * Rule table:
- *   1 measure × 1 time dim         → line
- *   N measures × 1 dim             → grouped bar
- *   1 measure × 2 dims             → heatmap OR stacked
- *   1 measure × 0 dims (scalar)    → KPI tile
- *   2 measures of same units       → scatter
- *   1 measure × 1 dim (≤ 8 categs) → bar
- *   1 measure × 1 dim (categorical, share) → treemap
+ * PRD D13: charts = Unovis (`@unovis/react` + `@unovis/ts`), Apache-2.0.
+ * TypeScript-first, modular tree-shaking, includes `VisGraph` for the
+ * knowledge-graph visualization (Phase 4) and the standard chart set
+ * (line, area, bar, scatter, KPI, treemap, heatmap, sankey, chord, ...).
+ * Imported directly from @unovis/react in apps/web — this package owns
+ * the *selection rules*, not the rendering primitives.
+ *
+ * The selectChartType() rule below is rule-based: result-shape → chart
+ * type. LLM proposes a chart type only when rules tie (PRD § Features
+ * lifted from Metabase).
  *
  * Region-aware color palettes: when a dim is detected as Indian states,
  * default the palette to a known-good 29-color set (Nebula §2.4).
  *
- * TODO Phase 8.
+ * TODO Phase 8: implement the actual <SmartChart spec={...}/> renderer
+ * that consumes a portable chart spec (the pinning unit) and dispatches
+ * to the right VisXxx component.
  */
 
 import type { ChartType } from "@insnav/pivot";
@@ -39,4 +42,4 @@ export function selectChartType(input: SelectChartInput): ChartType {
   return "table";
 }
 
-export const CHARTS_VERSION = "0.1.0";
+export const CHARTS_VERSION = "0.2.0";

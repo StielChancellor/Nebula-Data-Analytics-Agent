@@ -15,7 +15,9 @@ import { useAuth } from "@insnav/auth";
 import {
   ApiClient,
   type GraphEdge as Edge,
+  type DatasetListItem,
 } from "@insnav/api-client";
+import { KnowledgeGraphVisualization } from "./KnowledgeGraphVisualization";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
@@ -28,17 +30,26 @@ export function GraphView() {
 
   const [proposed, setProposed] = useState<Edge[]>([]);
   const [approved, setApproved] = useState<Edge[]>([]);
+  const [datasets, setDatasets] = useState<DatasetListItem[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // dataset_id → display label, so VisGraph nodes show human names not hex IDs
+  const datasetLabels = useMemo<Record<string, string>>(
+    () => Object.fromEntries(datasets.map((d) => [d.id, d.label])),
+    [datasets],
+  );
+
   const refresh = useCallback(async () => {
     try {
-      const [p, a] = await Promise.all([
+      const [p, a, ds] = await Promise.all([
         client.listEdgeProposals(),
         client.listApprovedEdges(),
+        client.listDatasets(),
       ]);
       setProposed(p);
       setApproved(a);
+      setDatasets(ds);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -94,6 +105,11 @@ export function GraphView() {
         busyId={busyId}
         onApprove={onApprove}
         onReject={onReject}
+      />
+
+      <KnowledgeGraphVisualization
+        approvedEdges={approved}
+        datasetLabels={datasetLabels}
       />
 
       <ApprovedSection items={approved} />

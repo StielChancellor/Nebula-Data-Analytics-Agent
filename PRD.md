@@ -30,6 +30,7 @@ The current local directory `C:\Users\AI-GiG\Desktop\eRC\Agent\InsightsNavigator
 | D10 | **Knowledge graph v1 = NetworkX in-process + Firestore persistence** ($0) | Cost guardrail (D11) ruled out Spanner Graph (~$650/mo). NetworkX covers our expected scale (< 5k edges/customer) for years. `packages/graph-store` abstraction makes Neo4j Aura swap a one-file port if we ever outgrow it. Mitigations for the two real losses (multi-instance write consistency, cold-start load time): pin orchestrator to 1 instance for v1; cache serialized graph in GCS |
 | D11 | **$5/month cost guardrail per service** (hard constraint) | No new GCP service costing more than $5/month without explicit user approval. Every infra addition must flag estimated monthly cost in the PR/plan. Forces every architecture call to consider cost-vs-value |
 | D12 | **MIT license** | Permissive; matches the "deployable template" intent. Anyone can fork, white-label, deploy commercially |
+| D13 | **Charts = Unovis** (`@unovis/react` + `@unovis/ts`) | TypeScript-first, modular tree-shaking, Apache-2.0 (compatible with our MIT), `VisGraph` natively fits the knowledge-graph viz, full chart set (line/area/bar/scatter/sankey/chord/heatmap). Replaces the original ECharts plan from the Nebula handoff |
 
 ## The 5-layer architecture (load-bearing)
 

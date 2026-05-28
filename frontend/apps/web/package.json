@@ -12,19 +12,21 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@insnav/locale": "workspace:*",
+    "@insnav/api-client": "workspace:*",
+    "@insnav/auth": "workspace:*",
     "@insnav/brand-runtime": "workspace:*",
     "@insnav/brand-static": "workspace:*",
-    "@insnav/api-client": "workspace:*",
-    "@insnav/ui-kit": "workspace:*",
     "@insnav/charts": "workspace:*",
-    "@insnav/pivot": "workspace:*",
-    "@insnav/dashboards": "workspace:*",
     "@insnav/chat": "workspace:*",
+    "@insnav/dashboards": "workspace:*",
+    "@insnav/locale": "workspace:*",
+    "@insnav/pivot": "workspace:*",
     "@insnav/share-embed": "workspace:*",
-    "@insnav/auth": "workspace:*"
+    "@insnav/ui-kit": "workspace:*",
+    "@unovis/react": "1.6.5",
+    "@unovis/ts": "1.6.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
