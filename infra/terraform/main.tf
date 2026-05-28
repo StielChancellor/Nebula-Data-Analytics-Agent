@@ -13,7 +13,7 @@ locals {
     "run.googleapis.com",
     "artifactregistry.googleapis.com",
     "bigquery.googleapis.com",
-    "aiplatform.googleapis.com",       # Vertex AI Gemini
+    "aiplatform.googleapis.com", # Vertex AI Gemini
     "secretmanager.googleapis.com",
     "firestore.googleapis.com",
     "storage.googleapis.com",
@@ -55,7 +55,7 @@ resource "google_storage_bucket" "staging" {
   # PRD Nebula §5.4: CORS must allow `Location` + `x-goog-resumable` response
   # headers so the resumable PUT flow works from the browser.
   cors {
-    origin          = ["*"]   # tighten to brand origins before prod
+    origin          = ["*"] # tighten to brand origins before prod
     method          = ["GET", "POST", "PUT", "OPTIONS"]
     response_header = ["Content-Type", "Location", "x-goog-resumable"]
     max_age_seconds = 3600
@@ -63,7 +63,7 @@ resource "google_storage_bucket" "staging" {
 
   lifecycle_rule {
     condition { age = 30 }
-    action    { type = "Delete" }   # Staging is ephemeral — wipe after 30d
+    action { type = "Delete" } # Staging is ephemeral — wipe after 30d
   }
 
   depends_on = [google_project_service.enabled]
@@ -160,8 +160,8 @@ resource "google_project_iam_member" "orchestrator" {
 
 resource "google_project_iam_member" "api_gateway" {
   for_each = toset([
-    "roles/datastore.user",                # Firestore reads for /v1/me/*
-    "roles/secretmanager.secretAccessor",  # JWT secret
+    "roles/datastore.user",               # Firestore reads for /v1/me/*
+    "roles/secretmanager.secretAccessor", # JWT secret
   ])
   project = var.project_id
   role    = each.key
@@ -188,7 +188,7 @@ resource "google_cloud_run_v2_service" "api_gateway" {
       }
     }
     scaling {
-      min_instance_count = 0          # scale to zero ($0 at idle)
+      min_instance_count = 0 # scale to zero ($0 at idle)
       max_instance_count = 5
     }
   }
