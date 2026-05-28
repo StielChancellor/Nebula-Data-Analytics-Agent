@@ -1,22 +1,17 @@
 """
 api_gateway — the REST + SSE surface for the platform.
 
-Phase 1 endpoints (additions to Phase 0):
-  POST /v1/auth/login     — bootstrap admin login → access token
-  GET  /v1/auth/me        — current principal from bearer token
-
-Endpoints now protected by current_principal dependency:
-  GET  /v1/me/datasets    — returns datasets the principal can access
-
-Always-public:
-  GET /healthz, /v1/me/brand, /v1/openapi.json, /v1/events-schema.json
+Phase 2 endpoints (additions to Phase 1):
+  POST /v1/uploads/start       — generate signed resumable upload URL
+  POST /v1/uploads/complete    — kick off BQ load + profile
+  GET  /v1/me/datasets         — real Firestore-backed list (replaces Phase 0 stub)
+  GET  /v1/datasets/{id}       — full dataset record with status
 
 Hot-reload locally:
     uvicorn services.api_gateway.app.main:app --reload --port 8000
 """
 from __future__ import annotations
 
-import os
 from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
@@ -32,26 +27,30 @@ from services.api_gateway.app.auth import (
     current_principal,
     issue_token,
 )
+from services.api_gateway.app.datasets_router import router as datasets_router
+from services.api_gateway.app.settings import get_settings
+from services.api_gateway.app.uploads import router as uploads_router
 
 app = FastAPI(
     title="Insights Navigator V2.0 — API Gateway",
-    version="0.2.0",
+    version="0.3.0",
     description=(
-        "Phase 1 scaffold. Bootstrap admin auth (Nebula §5.3) — Firebase Auth "
-        "multi-tenant ships in Phase 1.5. See PRD.md for the full architecture."
+        "Phase 2 — CSV ingestion via resumable signed URLs, BQ load, BQ-based "
+        "profiler. See PRD.md and docs/PHASE-2-STATUS.md."
     ),
 )
 
+_settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("INSNAV_CORS_ORIGINS", "*").split(","),
+    allow_origins=_settings.cors_origins.split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# ---------- Shapes ----------
+# ---------- Public endpoints ----------
 
 class BrandTokens(BaseModel):
     accent: str = "0 217 192"
@@ -71,17 +70,6 @@ class BrandConfig(BaseModel):
     featureFlags: dict[str, bool] = Field(default_factory=dict)
 
 
-class Dataset(BaseModel):
-    id: str
-    label: str
-    locale_hint: Literal["US", "IN"] = "US"
-    last_refreshed: str | None = None
-    row_count: int | None = None
-    scopes: list[str] = Field(default_factory=list)
-
-
-# ---------- Public endpoints ----------
-
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok", "service": "api_gateway", "version": app.version}
@@ -89,10 +77,7 @@ def healthz() -> dict[str, str]:
 
 @app.get("/v1/me/brand", response_model=BrandConfig)
 def get_brand(x_brand_id: str | None = Header(default=None)) -> BrandConfig:
-    """
-    Public so it can be fetched before login (the brand-runtime loader runs
-    before React mounts, before any token exists).
-    """
+    """Public so the frontend brand-runtime can fetch before login."""
     brand_id = x_brand_id or "nebula"
     if brand_id == "nebula":
         return BrandConfig(
@@ -122,18 +107,12 @@ def openapi_v1() -> JSONResponse:
     return JSONResponse(app.openapi())
 
 
-# ---------- Auth endpoints ----------
+# ---------- Auth ----------
 
 @app.post("/v1/auth/login", response_model=LoginResponse)
 def login(req: LoginRequest) -> LoginResponse:
-    """
-    Phase 1: bootstrap admin login only. Returns a 12h JWT.
-    Phase 1.5 will swap this for the Firebase Auth multi-tenant flow.
-    """
     principal = authenticate_bootstrap(req)
     if principal is None:
-        # Same response code/body whether the user doesn't exist or the password
-        # is wrong, to avoid user enumeration.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid email or password")
     token, ttl = issue_token(principal)
     return LoginResponse(access_token=token, expires_in=ttl)
@@ -144,16 +123,7 @@ def me(principal: Principal = Depends(current_principal)) -> Principal:
     return principal
 
 
-# ---------- Protected endpoints ----------
+# ---------- Routers ----------
 
-@app.get("/v1/me/datasets", response_model=list[Dataset])
-def list_datasets(principal: Principal = Depends(current_principal)) -> list[Dataset]:
-    """
-    Datasets the current principal can query. Empty in Phase 1; populated by
-    the ingestion pipeline + tenant_access lookups in Phase 2+.
-
-    The principal is unused for now but logged here so tests verify that
-    auth IS being applied (not just an empty list bypass).
-    """
-    _ = principal  # placeholder until tenant_access lookups land
-    return []
+app.include_router(datasets_router)
+app.include_router(uploads_router)

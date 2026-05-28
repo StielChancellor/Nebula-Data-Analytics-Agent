@@ -1,14 +1,64 @@
 /**
  * @insnav/api-client
  *
- * Generated REST client from /v1/openapi.json + SSE wrapper for streaming
- * agent responses.
- *
- * TODO Phase 1.5: wire `tools/openapi-codegen` to pull /v1/openapi.json on
- * prebuild and emit typed methods here. Until then, this module exposes a
- * minimal hand-written fetch wrapper sufficient for /v1/me/brand and
- * /v1/me/datasets.
+ * Phase 2: hand-written typed methods for the endpoints we currently expose.
+ * Phase 6+ replaces this with codegen from /v1/openapi.json (tools/openapi-codegen).
  */
+
+export type RegionCode = "US" | "IN";
+
+export type DatasetStatus =
+  | "queued"
+  | "uploading"
+  | "loading"
+  | "profiling"
+  | "ready"
+  | "failed";
+
+export interface DatasetListItem {
+  id: string;
+  label: string;
+  locale_hint: RegionCode;
+  status: DatasetStatus;
+  row_count: number | null;
+  column_count: number | null;
+  last_refreshed: string;
+  scopes: string[];
+}
+
+export interface Dataset {
+  id: string;
+  tenant_id: string;
+  brand: string;
+  label: string;
+  locale_hint: RegionCode;
+  source_filename: string;
+  source_size_bytes: number;
+  gcs_blob_path: string;
+  bq_table: string | null;
+  status: DatasetStatus;
+  row_count: number | null;
+  column_count: number | null;
+  created_at: string;
+  updated_at: string;
+  error: string | null;
+}
+
+export interface StartUploadResponse {
+  dataset_id: string;
+  signed_url: string;
+  gcs_blob_path: string;
+  expires_at: string;
+}
+
+export interface CompleteUploadResponse {
+  dataset_id: string;
+  status: DatasetStatus;
+  bq_table: string | null;
+  row_count: number | null;
+  column_count: number | null;
+  error: string | null;
+}
 
 const DEFAULT_BASE = "/api";
 
@@ -26,15 +76,80 @@ export class ApiClient {
     this.getToken = opts.getToken ?? (() => null);
   }
 
-  async get<T>(path: string): Promise<T> {
+  private async authHeaders(): Promise<HeadersInit> {
     const token = await this.getToken();
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      credentials: "include",
-    });
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async get<T>(path: string): Promise<T> {
+    const headers = await this.authHeaders();
+    const res = await fetch(`${this.baseUrl}${path}`, { headers, credentials: "include" });
     if (!res.ok) throw new Error(`GET ${path} -> ${res.status}`);
     return (await res.json()) as T;
   }
+
+  async post<T>(path: string, body: unknown): Promise<T> {
+    const headers = await this.authHeaders();
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`POST ${path} -> ${res.status}: ${text}`);
+    }
+    return (await res.json()) as T;
+  }
+
+  // --- Typed convenience methods (replace with codegen later) ---
+
+  listDatasets(): Promise<DatasetListItem[]> {
+    return this.get("/v1/me/datasets");
+  }
+
+  getDataset(id: string): Promise<Dataset> {
+    return this.get(`/v1/datasets/${id}`);
+  }
+
+  startUpload(filename: string, sizeBytes: number, opts: { label?: string; locale_hint?: RegionCode } = {}): Promise<StartUploadResponse> {
+    return this.post("/v1/uploads/start", { filename, size_bytes: sizeBytes, ...opts });
+  }
+
+  completeUpload(datasetId: string): Promise<CompleteUploadResponse> {
+    return this.post("/v1/uploads/complete", { dataset_id: datasetId });
+  }
+}
+
+/**
+ * Upload a File to a GCS signed-URL using XMLHttpRequest so we get upload
+ * progress events (fetch doesn't expose them).
+ *
+ * Phase 2: single-shot PUT (works for files up to a few GB). For files >
+ * ~2 GB, swap to chunked PUTs with Content-Range — GCS resumable sessions
+ * accept partial PUTs with 308 responses for in-progress, 200 when done.
+ * That's a Phase 2.5 follow-up if real users hit the wall.
+ */
+export function uploadToGcs(
+  signedUrl: string,
+  file: File,
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", signedUrl);
+    xhr.setRequestHeader("Content-Type", "text/csv");
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded, e.total);
+      };
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`GCS PUT failed: ${xhr.status} ${xhr.responseText}`));
+    };
+    xhr.onerror = () => reject(new Error("GCS PUT network error"));
+    xhr.send(file);
+  });
 }
