@@ -1,0 +1,20 @@
+# Copy to terraform.tfvars and edit for your GCP project.
+# terraform.tfvars is gitignored — don't commit it.
+
+project_id  = "insights-navigator-v2"
+region      = "us-central1"
+bq_location = "US"
+brand_id    = "nebula"
+
+# Phase 0: stand up the cheap stuff first. Flip these to true as you go.
+enable_artifact_registry = true
+enable_staging_bucket    = true
+enable_bq_datasets       = true
+enable_firestore         = true
+enable_secrets           = true
+
+# Wait until the first backend image has been built and pushed to AR.
+enable_cloud_run = false
+
+# Requires interactive Firebase project init via Firebase console first.
+enable_firebase_hosting = false

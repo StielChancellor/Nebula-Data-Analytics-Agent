@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"],
+    "noEmit": true,
+    // Workspace packages live outside apps/web — don't restrict rootDir.
+    "composite": false
+  },
+  "include": ["src", "vite.config.ts", "tailwind.config.js"]
+}

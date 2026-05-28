@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -------------------------------------------------------------
+   Aurora default theme tokens.
+   brand-runtime overrides --accent / --accent-glow / etc.
+   at runtime via GET /v1/me/brand.
+   ------------------------------------------------------------- */
+:root {
+  /* Electric teal on deep navy — the Aurora default brand */
+  --accent: 0 217 192;            /* #00D9C0  teal-500 ish  */
+  --accent-glow: 76 240 220;      /* lighter teal           */
+  --accent-soft: 14 50 47;        /* very dark teal surface */
+  --accent-foreground: 8 16 28;   /* dark text on teal      */
+}
+
+html, body, #root {
+  height: 100%;
+  min-height: 100vh;
+}
+
+html {
+  background: theme("colors.ink.900");
+  color: theme("colors.ink.100");
+  font-family: theme("fontFamily.sans");
+  font-feature-settings: "ss01", "cv11";  /* Inter cleaner numerals */
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Numeric data uses JetBrains Mono with tabular figures so columns align */
+.numeric, .font-mono {
+  font-variant-numeric: tabular-nums;
+}

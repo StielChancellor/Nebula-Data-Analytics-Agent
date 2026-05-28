@@ -1,0 +1,23 @@
+{
+  "name": "insights-navigator-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Insights Navigator V2.0 — frontend monorepo (Vite + React + Tailwind, pnpm workspace).",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @insnav/web dev",
+    "build": "pnpm --filter @insnav/web build",
+    "build:all": "pnpm -r --filter './apps/*' build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "packageManager": "pnpm@9.12.0"
+}
