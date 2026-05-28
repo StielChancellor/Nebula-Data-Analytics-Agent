@@ -58,6 +58,31 @@ export interface CompleteUploadResponse {
   row_count: number | null;
   column_count: number | null;
   error: string | null;
+  /** Phase 4: how many edges the auto-discoverer proposed for this dataset */
+  new_edge_proposals: number;
+}
+
+// --- Phase 4: knowledge-graph edges ---
+
+export type EdgeState = "proposed" | "approved" | "rejected";
+
+export interface GraphEdge {
+  id: string;
+  tenant_id: string;
+  from_dataset: string;
+  from_column: string;
+  to_dataset: string;
+  to_column: string;
+  similarity_score: number;
+  key_overlap_pct: number;
+  from_distinct_count: number | null;
+  to_distinct_count: number | null;
+  sample_overlap: string[];
+  state: EdgeState;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 const DEFAULT_BASE = "/api";
@@ -119,6 +144,27 @@ export class ApiClient {
 
   completeUpload(datasetId: string): Promise<CompleteUploadResponse> {
     return this.post("/v1/uploads/complete", { dataset_id: datasetId });
+  }
+
+  // --- Edges ---
+  listApprovedEdges(): Promise<GraphEdge[]> {
+    return this.get("/v1/edges");
+  }
+
+  listEdgeProposals(): Promise<GraphEdge[]> {
+    return this.get("/v1/edges/proposals");
+  }
+
+  approveEdge(id: string): Promise<GraphEdge> {
+    return this.post(`/v1/edges/${id}/approve`, {});
+  }
+
+  rejectEdge(id: string): Promise<GraphEdge> {
+    return this.post(`/v1/edges/${id}/reject`, {});
+  }
+
+  discoverEdges(datasetId: string): Promise<GraphEdge[]> {
+    return this.post(`/v1/datasets/${datasetId}/discover-edges`, {});
   }
 }
 

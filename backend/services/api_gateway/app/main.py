@@ -28,15 +28,17 @@ from services.api_gateway.app.auth import (
     issue_token,
 )
 from services.api_gateway.app.datasets_router import router as datasets_router
+from services.api_gateway.app.edges_router import router as edges_router
 from services.api_gateway.app.settings import get_settings
 from services.api_gateway.app.uploads import router as uploads_router
 
 app = FastAPI(
     title="Insights Navigator V2.0 — API Gateway",
-    version="0.3.0",
+    version="0.4.0",
     description=(
-        "Phase 2 — CSV ingestion via resumable signed URLs, BQ load, BQ-based "
-        "profiler. See PRD.md and docs/PHASE-2-STATUS.md."
+        "Phase 4 — knowledge graph: edge proposals via BQ key-overlap, "
+        "admin approve/reject UX, NetworkX-backed path queries. "
+        "See PRD.md and docs/PHASE-4-STATUS.md."
     ),
 )
 
@@ -127,3 +129,4 @@ def me(principal: Principal = Depends(current_principal)) -> Principal:
 
 app.include_router(datasets_router)
 app.include_router(uploads_router)
+app.include_router(edges_router)

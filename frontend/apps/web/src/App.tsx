@@ -17,6 +17,7 @@ import {
   type RegionCode,
 } from "@insnav/locale";
 import { DatasetsView } from "./views/DatasetsView";
+import { GraphView } from "./views/GraphView";
 
 interface AppProps {
   brand: BrandConfig;
@@ -24,7 +25,7 @@ interface AppProps {
 
 const DEMO_VALUE = 12_400_000;
 
-type Tab = "datasets" | "demo";
+type Tab = "datasets" | "graph" | "demo";
 
 export function App({ brand }: AppProps) {
   const auth = useAuth();
@@ -68,6 +69,7 @@ function AuthedShell({ brand }: { brand: BrandConfig }) {
 
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         {tab === "datasets" && <DatasetsView />}
+        {tab === "graph" && <GraphView />}
         {tab === "demo" && <LocaleDemoView brand={brand} />}
       </main>
     </div>
@@ -77,6 +79,7 @@ function AuthedShell({ brand }: { brand: BrandConfig }) {
 function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "datasets", label: "Datasets" },
+    { id: "graph", label: "Graph" },
     { id: "demo", label: "Locale demo" },
   ];
   return (

@@ -79,6 +79,10 @@ class CompleteUploadResponse(BaseModel):
     row_count: int | None = None
     column_count: int | None = None
     error: str | None = None
+    # Phase 4: how many new edge proposals were discovered for the
+    # just-uploaded dataset. Frontend surfaces this as a "3 edges to review"
+    # callout pointing at the Graph tab.
+    new_edge_proposals: int = 0
 
 
 # ---------- endpoints ----------
@@ -149,9 +153,26 @@ def complete_upload(
         update_dataset_status(ds.id, "profiling", bq_table=table_fqn, column_count=len(columns))
         row_count = _profile_table(ds.id, table_fqn, columns)
         update_dataset_status(ds.id, "ready", row_count=row_count)
+
+        # Phase 4: auto-discover edges for the just-loaded dataset.
+        # Wrapped in try/except so a discovery hiccup doesn't fail the
+        # whole upload — the dataset is already 'ready' at this point.
+        new_proposals: int = 0
+        try:
+            from services.api_gateway.app.edge_proposer import propose_for_dataset
+            from services.api_gateway.app.datasets import get_dataset as _get
+
+            fresh = _get(ds.id)
+            if fresh is not None:
+                proposals = propose_for_dataset(fresh)
+                new_proposals = len(proposals)
+        except Exception:  # noqa: BLE001 — proposer failure must not undo upload
+            logger.exception("edge discovery failed for dataset %s", ds.id)
+
         return CompleteUploadResponse(
             dataset_id=ds.id, status="ready", bq_table=table_fqn,
             row_count=row_count, column_count=len(columns),
+            new_edge_proposals=new_proposals,
         )
     except Exception as e:  # noqa: BLE001 — final fallback, must record failure
         logger.exception("upload complete failed for dataset %s", ds.id)
