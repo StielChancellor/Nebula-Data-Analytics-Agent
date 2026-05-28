@@ -1,16 +1,17 @@
 """
 api_gateway — the REST + SSE surface for the platform.
 
-Phase 0 scaffold: minimal endpoints to prove the frontend/backend seam works.
+Phase 1 endpoints (additions to Phase 0):
+  POST /v1/auth/login     — bootstrap admin login → access token
+  GET  /v1/auth/me        — current principal from bearer token
 
-  GET /healthz            — liveness probe (Cloud Run health check)
-  GET /v1/me/brand        — runtime brand tokens (used by frontend brand-runtime)
-  GET /v1/me/datasets     — list datasets the current user can access (empty for now)
-  GET /v1/openapi.json    — same as /openapi.json; codegen target for the FE api-client
-  GET /v1/events-schema.json — sibling SSE event schema (stub)
+Endpoints now protected by current_principal dependency:
+  GET  /v1/me/datasets    — returns datasets the principal can access
 
-Auth, real dataset access, ingestion, chat, pivot, dashboards land in later
-phases per the PRD build order. Hot-reload locally:
+Always-public:
+  GET /healthz, /v1/me/brand, /v1/openapi.json, /v1/events-schema.json
+
+Hot-reload locally:
     uvicorn services.api_gateway.app.main:app --reload --port 8000
 """
 from __future__ import annotations
@@ -18,21 +19,29 @@ from __future__ import annotations
 import os
 from typing import Any, Literal
 
-from fastapi import FastAPI, Header
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from services.api_gateway.app.auth import (
+    LoginRequest,
+    LoginResponse,
+    Principal,
+    authenticate_bootstrap,
+    current_principal,
+    issue_token,
+)
+
 app = FastAPI(
     title="Insights Navigator V2.0 — API Gateway",
-    version="0.1.0",
+    version="0.2.0",
     description=(
-        "Phase 0 scaffold. See PRD.md for the full architecture, agent swarm "
-        "wiring, and build order."
+        "Phase 1 scaffold. Bootstrap admin auth (Nebula §5.3) — Firebase Auth "
+        "multi-tenant ships in Phase 1.5. See PRD.md for the full architecture."
     ),
 )
 
-# CORS — wide-open in dev; tighten before prod.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("INSNAV_CORS_ORIGINS", "*").split(","),
@@ -42,7 +51,7 @@ app.add_middleware(
 )
 
 
-# ---------- Shapes (Phase 0) ----------
+# ---------- Shapes ----------
 
 class BrandTokens(BaseModel):
     accent: str = "0 217 192"
@@ -52,10 +61,6 @@ class BrandTokens(BaseModel):
 
 
 class BrandConfig(BaseModel):
-    """
-    Runtime brand response — frontend's @insnav/brand-runtime calls
-    GET /v1/me/brand on bootstrap and applies tokens before React mounts.
-    """
     brandId: str
     displayName: str
     tokens: BrandTokens
@@ -75,20 +80,18 @@ class Dataset(BaseModel):
     scopes: list[str] = Field(default_factory=list)
 
 
-# ---------- Endpoints ----------
+# ---------- Public endpoints ----------
 
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
-    return {"status": "ok", "service": "api_gateway", "version": "0.1.0"}
+    return {"status": "ok", "service": "api_gateway", "version": app.version}
 
 
 @app.get("/v1/me/brand", response_model=BrandConfig)
 def get_brand(x_brand_id: str | None = Header(default=None)) -> BrandConfig:
     """
-    Returns the runtime brand config for the requesting frontend.
-
-    Phase 0: returns the hardcoded Nebula brand. Phase 1 will look up the
-    brand from the JWT `brand` claim and the tenant_access table.
+    Public so it can be fetched before login (the brand-runtime loader runs
+    before React mounts, before any token exists).
     """
     brand_id = x_brand_id or "nebula"
     if brand_id == "nebula":
@@ -99,31 +102,11 @@ def get_brand(x_brand_id: str | None = Header(default=None)) -> BrandConfig:
             currencyDefault="USD",
             regionDefault="US",
         )
-    # Unknown brand → fall back to nebula so the frontend always renders.
-    return BrandConfig(
-        brandId=brand_id,
-        displayName=brand_id.title(),
-        tokens=BrandTokens(),
-    )
-
-
-@app.get("/v1/me/datasets", response_model=list[Dataset])
-def list_datasets() -> list[Dataset]:
-    """
-    Datasets the current user can query. Empty in Phase 0; populated by
-    the ingestion pipeline + tenant_access lookups in Phase 2+.
-    """
-    return []
+    return BrandConfig(brandId=brand_id, displayName=brand_id.title(), tokens=BrandTokens())
 
 
 @app.get("/v1/events-schema.json")
 def events_schema() -> JSONResponse:
-    """
-    Sibling to OpenAPI: documents the SSE event shapes the chat endpoint will
-    emit (agent narration, computation progress, partial chart specs).
-
-    Phase 0: skeleton. Phase 6: populate as the agent swarm is built.
-    """
     schema: dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "Insights Navigator V2.0 — SSE event schema",
@@ -134,8 +117,43 @@ def events_schema() -> JSONResponse:
     return JSONResponse(schema)
 
 
-# Convenience: also expose /v1/openapi.json so the frontend codegen can pin a
-# versioned path (rather than depending on FastAPI's /openapi.json default).
 @app.get("/v1/openapi.json")
 def openapi_v1() -> JSONResponse:
     return JSONResponse(app.openapi())
+
+
+# ---------- Auth endpoints ----------
+
+@app.post("/v1/auth/login", response_model=LoginResponse)
+def login(req: LoginRequest) -> LoginResponse:
+    """
+    Phase 1: bootstrap admin login only. Returns a 12h JWT.
+    Phase 1.5 will swap this for the Firebase Auth multi-tenant flow.
+    """
+    principal = authenticate_bootstrap(req)
+    if principal is None:
+        # Same response code/body whether the user doesn't exist or the password
+        # is wrong, to avoid user enumeration.
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid email or password")
+    token, ttl = issue_token(principal)
+    return LoginResponse(access_token=token, expires_in=ttl)
+
+
+@app.get("/v1/auth/me", response_model=Principal)
+def me(principal: Principal = Depends(current_principal)) -> Principal:
+    return principal
+
+
+# ---------- Protected endpoints ----------
+
+@app.get("/v1/me/datasets", response_model=list[Dataset])
+def list_datasets(principal: Principal = Depends(current_principal)) -> list[Dataset]:
+    """
+    Datasets the current principal can query. Empty in Phase 1; populated by
+    the ingestion pipeline + tenant_access lookups in Phase 2+.
+
+    The principal is unused for now but logged here so tests verify that
+    auth IS being applied (not just an empty list bypass).
+    """
+    _ = principal  # placeholder until tenant_access lookups land
+    return []

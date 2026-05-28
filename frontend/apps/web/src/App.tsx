@@ -1,18 +1,17 @@
 /**
- * Phase 0 shell app.
+ * Phase 1 shell app.
  *
- * What this demonstrates:
- * - brand-runtime wired in (Aurora teal accent visible)
- * - locale package exercised for both US and IN (proves Lakh/Crore + en-IN
- *   grouping work end-to-end)
- * - LICENSE/PRD/architecture readable from the shell
- *
- * What it does NOT do yet:
- * - Auth, chat, pivot, dashboards, charts, upload — those land in later
- *   phases per PRD build order.
+ * Renders <LoginScreen/> when unauth'd; the brand demo (with Sign Out) when
+ * auth'd. Demonstrates the full Phase 1 contract end-to-end:
+ *   1. brand-runtime applies tokens before React mounts
+ *   2. AuthProvider validates any stored JWT on boot
+ *   3. Protected endpoints (/v1/me/datasets) are reached with the JWT
+ *      attached automatically
+ *   4. Locale formatting flips US ↔ IN at runtime (Lakh/Crore proof)
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { BrandConfig } from "@insnav/brand-runtime";
+import { useAuth, LoginScreen } from "@insnav/auth";
 import {
   formatCurrency,
   formatCurrencyCompact,
@@ -26,33 +25,71 @@ interface AppProps {
   brand: BrandConfig;
 }
 
-const DEMO_VALUE = 12_400_000; // $12.4M / ₹1.24 Cr
+const DEMO_VALUE = 12_400_000;
 
 export function App({ brand }: AppProps) {
+  const auth = useAuth();
+
+  if (auth.status === "loading") {
+    return <BootSplash />;
+  }
+  if (auth.status !== "authenticated" || !auth.principal) {
+    return <LoginScreen brandName={brand.displayName} brandLogoUrl={brand.logoUrl} />;
+  }
+  return <AuthedShell brand={brand} />;
+}
+
+function BootSplash() {
+  return (
+    <div className="min-h-screen bg-ink-900 text-ink-300 grid place-items-center text-[12px]">
+      Loading…
+    </div>
+  );
+}
+
+function AuthedShell({ brand }: { brand: BrandConfig }) {
+  const auth = useAuth();
   const [region, setRegion] = useState<RegionCode>(brand.regionDefault);
+  const [datasetsCount, setDatasetsCount] = useState<number | null>(null);
   const today = new Date();
+
+  // Demonstrate that protected endpoints work
+  useEffect(() => {
+    if (!auth.token) return;
+    fetch(`${import.meta.env.VITE_API_BASE || "/api"}/v1/me/datasets`, {
+      headers: { Authorization: `Bearer ${auth.token}` },
+    })
+      .then((r) => r.json())
+      .then((rows: unknown[]) => setDatasetsCount(rows.length))
+      .catch(() => setDatasetsCount(null));
+  }, [auth.token]);
 
   return (
     <div className="min-h-screen bg-ink-900 text-ink-100">
       <header className="border-b border-ink-700/60 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-md bg-accent/15 ring-1 ring-accent/30 grid place-items-center text-accent font-semibold">
-            ✦
-          </div>
+          <img src={brand.logoUrl} alt="" className="h-8 w-8" />
           <div>
             <div className="text-sm font-semibold tracking-wide">{brand.displayName}</div>
-            <div className="text-[11px] text-ink-300 font-mono">brand: {brand.brandId} · phase 0 shell</div>
+            <div className="text-[11px] text-ink-300 font-mono">
+              brand: {brand.brandId} · tenant: {auth.principal?.tenant_id} · phase 1
+            </div>
           </div>
         </div>
-        <RegionToggle region={region} setRegion={setRegion} />
+        <div className="flex items-center gap-3">
+          <RegionToggle region={region} setRegion={setRegion} />
+          <AccountMenu />
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         <section>
-          <h1 className="text-2xl font-semibold">Project Insights Navigator V2.0</h1>
+          <h1 className="text-2xl font-semibold">
+            Welcome, <span className="text-accent-glow">{auth.principal?.email}</span>
+          </h1>
           <p className="text-ink-300 mt-1">
-            Phase 0 scaffold. Backend wires up next; this shell exists to verify the brand-runtime ↔ locale
-            contract works end-to-end.
+            Phase 1 shell. Bootstrap admin auth wired end-to-end. Backend issues HS256 JWT;
+            frontend stores it; /v1/me/datasets is reachable with it.
           </p>
         </section>
 
@@ -64,14 +101,29 @@ export function App({ brand }: AppProps) {
         </section>
 
         <section className="text-[12px] text-ink-300 leading-relaxed border border-ink-700/60 rounded-md p-4 bg-ink-800/60">
-          <strong className="text-ink-100">India non-negotiable (PRD §8):</strong> when region = IN, every number
-          uses ₹, en-IN grouping (1,24,00,000), Lakh/Crore compaction, Apr-Mar FY default, Asia/Kolkata timezone.
-          Toggle the region above to verify.
+          <strong className="text-ink-100">API check:</strong>{" "}
+          <span className="font-mono">
+            GET /v1/me/datasets → {datasetsCount === null ? "…" : `${datasetsCount} rows`}
+          </span>
+          {" (empty until Phase 2 ingestion lands)."}
         </section>
 
         <NextSteps />
       </main>
     </div>
+  );
+}
+
+function AccountMenu() {
+  const auth = useAuth();
+  return (
+    <button
+      type="button"
+      onClick={auth.logout}
+      className="text-[12px] px-3 py-1.5 rounded border border-ink-700/60 hover:bg-ink-700/40 transition-colors"
+    >
+      Sign out
+    </button>
   );
 }
 
@@ -111,12 +163,12 @@ function NextSteps() {
     <section className="border border-ink-700/60 rounded-md p-4 bg-ink-800/40">
       <div className="text-[11px] uppercase tracking-wider text-ink-300 mb-2">Next phases (see PRD)</div>
       <ol className="text-[12px] space-y-1 text-ink-200 list-decimal list-inside">
-        <li>Backend foundations: GCP wiring, Firebase Auth multi-tenant, bootstrap admin.</li>
-        <li>CSV ingestion + profiler + schema catalog (Cloud Run job → BQ raw).</li>
-        <li>Knowledge graph: edge proposals + admin confirmation UX (NetworkX + Firestore).</li>
-        <li>Cube auto-generation from confirmed edges.</li>
-        <li>Single-source MVP through the agent swarm (Orchestrator + Semantic + Critic + DQ).</li>
-        <li>Pivot panel — every Nebula §2.1 + §2.2 feature in one PR.</li>
+        <li>Phase 1.5: Firebase Auth multi-tenant (swap bootstrap admin for real users).</li>
+        <li>Phase 2: CSV ingestion + profiler + schema catalog (Cloud Run job → BQ raw).</li>
+        <li>Phase 4: Knowledge graph: edge proposals + admin confirmation (NetworkX + Firestore).</li>
+        <li>Phase 5: Cube auto-generation from confirmed edges.</li>
+        <li>Phase 6: Single-source MVP through the agent swarm.</li>
+        <li>Phase 7: Pivot panel — every Nebula §2.1 + §2.2 feature in one PR.</li>
       </ol>
     </section>
   );

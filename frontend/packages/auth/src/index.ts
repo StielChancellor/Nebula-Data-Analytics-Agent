@@ -1,19 +1,26 @@
 /**
- * @insnav/auth
+ * @insnav/auth — frontend auth surface.
  *
- * Firebase Auth multi-tenant. One Firebase project per backend; one Firebase
- * tenant per brand. JWT carries `tenant_id` + `brand` claims; same token
- * format across all brand frontends (PRD D8).
+ * Phase 1: bootstrap admin login flow (HS256 JWT from backend).
+ * Phase 1.5: swap to Firebase Auth multi-tenant SDK. The shapes here mirror
+ *            what Firebase returns so the AuthProvider stays unchanged.
  *
- * Also: bootstrap-admin override via env vars for MVP shipping pre-user-mgmt
- * (Nebula §5.3). Rotate before any real customer.
- *
- * TODO Phase 1.
+ * Exports:
+ *   AuthProvider           — wrap your <App/> with this
+ *   useAuth()              — { principal, token, login, logout, status }
+ *   AuthState              — type shape
+ *   loadStoredToken()      — read token from localStorage on bootstrap
  */
+export type {
+  AuthState,
+  Principal,
+  AuthStatus,
+  AuthContextValue,
+  LoginRequest,
+  LoginResponse,
+} from "./types";
 
-export interface AuthState {
-  user: { id: string; email: string; tenantId: string; brand: string } | null;
-  token: string | null;
-}
+export { AuthProvider, useAuth, loadStoredToken } from "./AuthProvider";
+export { LoginScreen } from "./LoginScreen";
 
-export const AUTH_VERSION = "0.1.0";
+export const AUTH_VERSION = "0.2.0";

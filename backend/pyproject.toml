@@ -25,6 +25,7 @@ dependencies = [
   "networkx>=3.3",          # knowledge graph (PRD D10)
   "python-dotenv>=1.0",
   "sse-starlette>=2.1",     # SSE streaming for chat (Phase 6)
+  "pyjwt>=2.9",             # Bootstrap admin auth HS256 (Phase 1). Firebase RS256 in Phase 1.5
 ]
 
 [project.optional-dependencies]
@@ -40,10 +41,13 @@ llm = [
   "google-genai>=0.3",
   "anthropic>=0.34",
 ]
-# Auth + secrets (Phase 1)
+# Auth + secrets (Phase 1.5 — Firebase Auth multi-tenant + Secret Manager)
+# pyjwt is already in core deps (HS256 bootstrap mode); [crypto] adds RS256
+# for Firebase. argon2-cffi for password hashing when we have real users.
 secrets = [
   "pyjwt[crypto]>=2.9",
   "argon2-cffi>=23.1",
+  "google-cloud-secret-manager>=2.20",
 ]
 # Exports (Phase 8)
 exports = [
