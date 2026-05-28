@@ -106,7 +106,9 @@ resource "google_firestore_database" "default" {
 resource "google_secret_manager_secret" "jwt" {
   count     = var.enable_secrets ? 1 : 0
   secret_id = "insnav-jwt-secret"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   labels     = var.labels
   depends_on = [google_project_service.enabled]
 }
@@ -114,7 +116,9 @@ resource "google_secret_manager_secret" "jwt" {
 resource "google_secret_manager_secret" "anthropic_api_key" {
   count     = var.enable_secrets ? 1 : 0
   secret_id = "anthropic-api-key"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   labels     = var.labels
   depends_on = [google_project_service.enabled]
 }
