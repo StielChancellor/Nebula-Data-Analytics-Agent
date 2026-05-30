@@ -23,7 +23,7 @@ from insnav_agents import ChatAnswer, answer_question
 from insnav_cube_client import CubeQueryClient, build_tenant_schemas
 from insnav_contracts.envelope import compute_inputs_hash
 from insnav_graph_store import list_approved_edges
-from insnav_llm_router import get_default_router
+from insnav_llm_router import build_router, list_models
 from pydantic import BaseModel, Field
 
 from services.api_gateway.app.auth import Principal, current_principal
@@ -50,6 +50,17 @@ class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     # Empty → all of the tenant's ready datasets.
     dataset_ids: list[str] = Field(default_factory=list)
+    # Which brain to use (from GET /v1/llm/options). None → the default.
+    llm: str | None = None
+
+
+@router.get("/v1/llm/options")
+def llm_options(
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> list[dict]:
+    """The LLM dropdown: available brains + which are usable in this deploy."""
+    _ = principal
+    return list_models()
 
 
 @router.post("/v1/chat", response_model=ChatAnswer)
@@ -67,7 +78,7 @@ async def chat(
 
     schemas, health = _catalog_and_health(principal.tenant_id, req.dataset_ids)
 
-    llm = get_default_router()
+    llm = build_router(req.llm)
     cube = CubeQueryClient(
         api_url=settings.cube_api_url,
         api_secret=settings.cube_api_secret,

@@ -1,5 +1,18 @@
 # Phase 5c status — Cube Store for production
 
+> **UPDATE — NOW LIVE (scale-to-zero).** The earlier `exit(101)` panic was Cube
+> Store's GCS driver (it needs a base64 SA key — no Cloud Run ADC). Fix: drop the
+> `CUBESTORE_GCS_*` env and let Cube Store use **local ephemeral storage** (it's a
+> cache/router, not the source of truth — BigQuery is — so it just rebuilds on
+> scale-up). Deployed with `enable_cube_store=true`. Live smoke test in
+> **production mode** returned correct data with `"extDbType":"cubestore"`
+> (HTTP 200) — confirming the query ran through Cube Store, not dev mode. Public
+> but **JWT-enforced** (safe in prod mode), `min_instance_count=0` → **$0 idle**.
+> The cost decision below now only applies if you later want always-on (min=1) for
+> cold-start-free latency.
+
+---
+
 > Goal: run Cube in **production mode** (JWT enforced, no Playground) instead of
 > the dev-mode embedded store. On Cloud Run that means a Cube Store **sidecar**
 > in the same service (Cube↔Cube Store uses a non-HTTP protocol, so they can't

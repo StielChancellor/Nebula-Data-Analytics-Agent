@@ -356,9 +356,13 @@ resource "google_cloud_run_v2_service" "cube" {
     }
 
     # Phase 5c: Cube Store sidecar (prod-mode query/cache engine). Shares
-    # localhost with the cube container; durable data lives in GCS. Only one
-    # container in the service has `ports` (the cube API ingress), so this is a
-    # sidecar. Cube Store metastore prefers a single instance — see scaling.
+    # localhost with the cube container; only the cube container has `ports`, so
+    # this is a sidecar. Storage is LOCAL/ephemeral on purpose: Cube Store is a
+    # cache + query router, not the source of truth (BigQuery is) — on
+    # scale-down it just rebuilds. We deliberately do NOT use CUBESTORE_GCS_* :
+    # Cube Store's GCS driver needs a base64 SA key (no Cloud Run ADC) and
+    # panics without one. Cap at one instance (scaling) so there's a single
+    # local metastore.
     dynamic "containers" {
       for_each = var.enable_cube_store ? [1] : []
       content {
@@ -373,14 +377,6 @@ resource "google_cloud_run_v2_service" "cube" {
         env {
           name  = "CUBESTORE_SERVER_NAME"
           value = "localhost:3030"
-        }
-        env {
-          name  = "CUBESTORE_GCS_BUCKET"
-          value = "${var.project_id}-staging"
-        }
-        env {
-          name  = "CUBESTORE_GCS_SUB_PATH"
-          value = "cubestore"
         }
       }
     }

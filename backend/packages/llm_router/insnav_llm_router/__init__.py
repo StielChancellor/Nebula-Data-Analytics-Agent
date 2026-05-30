@@ -9,12 +9,25 @@ directly. They call `llm.generate(...)`. This lets us:
   - test agents with a stub provider without monkey-patching SDKs
 """
 from .router import (
+    DEFAULT_MODEL_ID,
+    MODELS,
+    LLMProvider,
     LLMResponse,
     LLMRouter,
-    LLMProvider,
+    build_router,
     get_default_router,
+    list_models,
 )
 
-__all__ = ["LLMResponse", "LLMRouter", "LLMProvider", "get_default_router"]
+__all__ = [
+    "LLMResponse",
+    "LLMRouter",
+    "LLMProvider",
+    "get_default_router",
+    "build_router",
+    "list_models",
+    "MODELS",
+    "DEFAULT_MODEL_ID",
+]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

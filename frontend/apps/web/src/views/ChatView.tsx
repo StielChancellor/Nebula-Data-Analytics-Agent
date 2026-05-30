@@ -5,8 +5,8 @@
  * data-health badge, the Cube query that ran (show-your-work), and the result.
  * Clarify/refuse answers render their message instead of forcing a result.
  */
-import { useMemo, useState } from "react";
-import { ApiClient, type ChatAnswer } from "@insnav/api-client";
+import { useEffect, useMemo, useState } from "react";
+import { ApiClient, type ChatAnswer, type LlmOption } from "@insnav/api-client";
 import { useAuth } from "@insnav/auth";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
@@ -22,13 +22,26 @@ export function ChatView() {
   const [answer, setAnswer] = useState<ChatAnswer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [models, setModels] = useState<LlmOption[]>([]);
+  const [model, setModel] = useState<string>("");
+
+  // Load the LLM dropdown options once.
+  useEffect(() => {
+    client
+      .listLlmOptions()
+      .then((opts) => {
+        setModels(opts);
+        setModel(opts.find((o) => o.default)?.id ?? opts[0]?.id ?? "");
+      })
+      .catch(() => setModels([]));
+  }, [client]);
 
   const ask = async () => {
     if (!question.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      setAnswer(await client.chat(question.trim()));
+      setAnswer(await client.chat(question.trim(), [], model || undefined));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -38,12 +51,30 @@ export function ChatView() {
 
   return (
     <section className="space-y-4">
-      <header>
-        <h2 className="text-lg font-semibold">Ask your data</h2>
-        <p className="text-[12px] text-ink-300 mt-0.5">
-          The agent selects governed measures &amp; dimensions; Cube compiles the SQL. Every
-          answer shows what it understood, the data health, and the exact query it ran.
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Ask your data</h2>
+          <p className="text-[12px] text-ink-300 mt-0.5">
+            The agent selects governed measures &amp; dimensions; Cube compiles the SQL. Every
+            answer shows what it understood, the data health, and the exact query it ran.
+          </p>
+        </div>
+        {models.length > 0 && (
+          <label className="shrink-0 text-[11px] text-ink-300 flex items-center gap-2">
+            Brain
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="bg-ink-900 border border-ink-700/60 rounded px-2 py-1 text-[12px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id} disabled={!m.available}>
+                  {m.label}{m.available ? "" : " (not configured)"}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </header>
 
       <div className="flex items-start gap-2">

@@ -178,3 +178,75 @@ def get_default_router() -> LLMRouter:
             fallback = None
 
     return LLMRouter(primary, fallback)
+
+
+# ---------- model registry + per-request switcher (LLM dropdown) ----------
+
+# The set of brains the UI can switch between. Gemini 3.0 Preview is the default
+# (PRD D6). Add/remove entries here to change what the dropdown offers.
+MODELS: list[dict[str, str]] = [
+    {"id": "gemini-3.0-preview", "label": "Gemini 3.0 Preview (default)", "provider": "gemini", "model": "gemini-3.0-preview"},
+    {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro", "provider": "gemini", "model": "gemini-2.5-pro"},
+    {"id": "claude-sonnet-4-5", "label": "Claude Sonnet 4.5", "provider": "claude", "model": "claude-sonnet-4-5"},
+    {"id": "stub", "label": "Stub (offline / no brain)", "provider": "stub", "model": "stub-1"},
+]
+
+DEFAULT_MODEL_ID = "gemini-3.0-preview"
+
+
+def _provider_available(provider: str) -> bool:
+    """Whether this provider's SDK (+ creds where applicable) is usable here."""
+    if provider == "stub":
+        return True
+    if provider == "gemini":
+        try:
+            import google.genai  # noqa: F401
+            return True
+        except Exception:
+            return False
+    if provider == "claude":
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            return False
+        try:
+            import anthropic  # noqa: F401
+            return True
+        except Exception:
+            return False
+    return False
+
+
+def list_models() -> list[dict[str, Any]]:
+    """The dropdown options + whether each is actually usable in this deploy."""
+    out: list[dict[str, Any]] = []
+    for m in MODELS:
+        out.append({**m, "available": _provider_available(m["provider"]), "default": m["id"] == DEFAULT_MODEL_ID})
+    return out
+
+
+def build_router(model_id: str | None) -> LLMRouter:
+    """
+    Build a router for a specific model id (from the dropdown). Degrades
+    gracefully: if the chosen brain isn't usable here (SDK/creds missing), it
+    returns a Stub router so the orchestrator honestly clarifies rather than
+    erroring. None → the default router.
+    """
+    if not model_id:
+        return get_default_router()
+    spec = next((m for m in MODELS if m["id"] == model_id), None)
+    if spec is None or not _provider_available(spec["provider"]):
+        return LLMRouter(StubProvider())
+
+    provider, model = spec["provider"], spec["model"]
+    if provider == "stub":
+        return LLMRouter(StubProvider())
+    if provider == "gemini":
+        primary: LLMProvider = GeminiProvider(model=model)
+    elif provider == "claude":
+        primary = ClaudeProvider(model=model)
+    else:
+        primary = StubProvider()
+
+    fallback: LLMProvider | None = None
+    if provider != "claude" and os.getenv("ANTHROPIC_API_KEY") and _provider_available("claude"):
+        fallback = ClaudeProvider()
+    return LLMRouter(primary, fallback)

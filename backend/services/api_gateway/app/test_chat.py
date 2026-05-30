@@ -57,7 +57,8 @@ def _patch_llm(monkeypatch, payload: dict):
         name = "stub"; model = "fake"
         async def generate(self, *, prompt, system=None, max_tokens=16384):
             return LLMResponse(text=json.dumps(payload), model="fake", provider="stub")
-    monkeypatch.setattr(chat_mod, "get_default_router", lambda: LLMRouter(_P()))
+    # The endpoint calls build_router(req.llm); make any choice yield our fake.
+    monkeypatch.setattr(chat_mod, "build_router", lambda _model_id: LLMRouter(_P()))
 
 
 def _good(payload_overrides=None):
@@ -106,6 +107,22 @@ def test_chat_caches_identical_question(client, monkeypatch):
     b = client.post("/v1/chat", headers=h, json={"question": "revenue by city"}).json()
     assert a["inputs_hash"] == b["inputs_hash"]
     assert b["kind"] == "answer"
+
+
+def test_llm_options_lists_models(client):
+    r = client.get("/v1/llm/options", headers=_headers(client))
+    assert r.status_code == 200
+    ids = [m["id"] for m in r.json()]
+    assert "gemini-3.0-preview" in ids
+    assert "stub" in ids
+    # stub is always available; exactly one default
+    by_id = {m["id"]: m for m in r.json()}
+    assert by_id["stub"]["available"] is True
+    assert by_id["gemini-3.0-preview"]["default"] is True
+
+
+def test_llm_options_requires_auth(client):
+    assert client.get("/v1/llm/options").status_code == 401
 
 
 def test_chat_no_datasets_refuses(client, monkeypatch):

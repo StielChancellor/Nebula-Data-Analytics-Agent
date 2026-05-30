@@ -192,10 +192,24 @@ export class ApiClient {
     return this.post("/v1/cube/sync", {});
   }
 
-  /** Ask the agent swarm a natural-language question. */
-  chat(question: string, datasetIds: string[] = []): Promise<ChatAnswer> {
-    return this.post("/v1/chat", { question, dataset_ids: datasetIds });
+  /** Ask the agent swarm a natural-language question (optionally pick the brain). */
+  chat(question: string, datasetIds: string[] = [], llm?: string): Promise<ChatAnswer> {
+    return this.post("/v1/chat", { question, dataset_ids: datasetIds, llm });
   }
+
+  /** Available LLM "brains" for the dropdown. */
+  listLlmOptions(): Promise<LlmOption[]> {
+    return this.get("/v1/llm/options");
+  }
+}
+
+export interface LlmOption {
+  id: string;
+  label: string;
+  provider: string;
+  model: string;
+  available: boolean;
+  default: boolean;
 }
 
 // --- Chat / agent swarm (Phase 6) ---
