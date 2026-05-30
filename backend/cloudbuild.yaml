@@ -1,0 +1,20 @@
+# Cloud Build config for the backend image.
+# The Dockerfile lives at a non-default path (services/api_gateway/Dockerfile)
+# but its build context is the backend/ root, so a plain `--tag` submit won't
+# find it. Submit with:
+#   gcloud builds submit backend \
+#     --config=backend/cloudbuild.yaml \
+#     --substitutions=_IMAGE=us-central1-docker.pkg.dev/insights-navigator-v2/insnav/api:latest
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - services/api_gateway/Dockerfile
+      - -t
+      - ${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -315,7 +315,10 @@ def render_to_js(schema: CubeSchema) -> str:
     lines.append("  dimensions: {")
     for d in schema.dimensions:
         lines.append(f"    {d.name}: {{")
-        lines.append(f"      sql: `{d.sql}`,")
+        # _escape so the BQ identifier backticks survive as LITERAL backticks
+        # inside the JS template literal (otherwise `\`city\`` closes the
+        # template early → "could not be cloned" compile error in Cube).
+        lines.append(f"      sql: `{_escape(d.sql)}`,")
         lines.append(f"      type: `{d.type}`,")
         if d.primary_key:
             lines.append("      primary_key: true,")
@@ -331,7 +334,7 @@ def render_to_js(schema: CubeSchema) -> str:
         lines.append(f"    {m.name}: {{")
         lines.append(f"      type: `{m.type}`,")
         if m.sql:
-            lines.append(f"      sql: `{m.sql}`,")
+            lines.append(f"      sql: `{_escape(m.sql)}`,")
         if m.title:
             lines.append(f"      title: `{_escape(m.title)}`,")
         if m.revenue_touching:
@@ -345,7 +348,9 @@ def render_to_js(schema: CubeSchema) -> str:
         lines.append("  joins: {")
         for j in schema.joins:
             lines.append(f"    {j.to_cube}: {{")
-            lines.append(f"      sql: `{j.sql_clause}`,")
+            # _escape the BQ backticks; the ${CUBE}/${other} interpolations
+            # are left live (not backticks) so Cube fills them at compile time.
+            lines.append(f"      sql: `{_escape(j.sql_clause)}`,")
             lines.append(f"      relationship: `{j.relationship}`,")
             lines.append(f"      // from_edge_id: {j.from_edge_id}")
             lines.append("    },")

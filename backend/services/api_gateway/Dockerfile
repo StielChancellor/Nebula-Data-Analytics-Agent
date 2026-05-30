@@ -10,8 +10,11 @@ COPY pyproject.toml ./
 COPY packages ./packages
 COPY services ./services
 
+# Install with the [gcp] extra so the runtime has google-cloud-storage /
+# bigquery / firestore — needed by uploads, the profiler, the edge proposer,
+# and the cube-gen job (which runs from this same image).
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir .
+ && pip install --no-cache-dir '.[gcp]'
 
 FROM python:3.11-slim
 WORKDIR /app

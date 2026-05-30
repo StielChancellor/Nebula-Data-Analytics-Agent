@@ -31,6 +31,20 @@ resource "google_project_service" "enabled" {
   disable_on_destroy         = false
 }
 
+# ---------- 1b) Cloud Build permissions ----------
+# Newer GCP projects run Cloud Build as the Compute Engine default SA, which
+# needs the builder role to read the source tarball, push to Artifact Registry,
+# and write logs. Without this, `gcloud builds submit` fails with a 403 on the
+# cloudbuild source bucket. (Discovered building the Cube + backend images.)
+data "google_project" "this" {}
+
+resource "google_project_iam_member" "cloudbuild_builder" {
+  project    = var.project_id
+  role       = "roles/cloudbuild.builds.builder"
+  member     = "serviceAccount:${data.google_project.this.number}-compute@developer.gserviceaccount.com"
+  depends_on = [google_project_service.enabled]
+}
+
 # ---------- 2) Artifact Registry (Docker images) ----------
 resource "google_artifact_registry_repository" "insnav" {
   count         = var.enable_artifact_registry ? 1 : 0
@@ -286,8 +300,11 @@ resource "google_cloud_run_v2_service" "cube" {
         value = var.project_id
       }
       env {
-        name  = "CUBEJS_DEV_MODE"
-        value = "false"
+        name = "CUBEJS_DEV_MODE"
+        # Secure default false (prod mode → needs a separate Cube Store). Set
+        # cube_dev_mode=true in terraform.tfvars for a single-container MVP
+        # (embedded Cube Store) — keep the service PRIVATE when you do.
+        value = var.cube_dev_mode ? "true" : "false"
       }
       env {
         name  = "INSNAV_CUBE_MODEL_BUCKET"

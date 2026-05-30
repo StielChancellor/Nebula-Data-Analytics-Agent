@@ -89,10 +89,86 @@
 | Approve edge → model version changes | ✅ |
 | Cube token tamper detectable | ✅ |
 
+## LIVE DEPLOY — COMPLETE ✅
+
+Cube is deployed and verified end-to-end on `insights-navigator-v2`.
+
+| Thing | Value |
+|---|---|
+| Cube service | `insnav-cube` (Cloud Run, us-central1) — **private** (no public invoker) |
+| URL | `https://insnav-cube-q3rm3dw2tq-uc.a.run.app` |
+| cube-gen job | `insnav-cube-gen` (Cloud Run Job, backend image) |
+| Images | `…/insnav/cube:latest` + `…/insnav/api:latest` (built via Cloud Build) |
+| Secret | `cube-api-secret` v2 (v1 had a trailing newline — see bugs) |
+| Mode | dev mode (embedded Cube Store) via `cube_dev_mode=true` in local tfvars |
+
+**End-to-end smoke test passed.** Seeded `raw.smoke` (3 rows) + published a
+model to GCS, then queried the live Cube REST API:
+
+- `GET /cubejs-api/v1/meta` → `cubes: ['smoke__smoke']` (model loaded from GCS,
+  compiled, JWT verified)
+- `GET /cubejs-api/v1/load` (`sum_revenue by city`) →
+  `[{city: Mumbai, sum_revenue: 125}, {city: Pune, sum_revenue: 50}]`
+  — **correct aggregation, computed by Cube → BigQuery.**
+
+Proven live: image build → deploy → boot → read model from GCS
+(repositoryFactory + schemaVersion) → compile schema → JWT auth + tenant
+guard → deterministic SQL → BigQuery → correct rows.
+
+### Two bugs found + fixed during deploy
+
+1. **Secret trailing newline.** `python -c "print(...)"` wrote the secret with
+   a Windows `\r\n`, so the Cube container's `CUBEJS_API_SECRET` (50 bytes)
+   didn't match the locally-signed token (newline stripped by `$()`) → every
+   call was `{"error":"Invalid token"}`. Fixed: store with `sys.stdout.write`
+   (no newline) as v2.
+2. **Nested-backtick compile error (the important one).** The generator wraps
+   column names in BQ backticks; `render_to_js` wrapped the whole `sql:` value
+   in a JS template literal (also backticks) WITHOUT escaping, so
+   `` sql: `\`city\`` `` closed the template early → Cube failed with a
+   `DataCloneError: … could not be cloned` (the worker-thread error masked the
+   real parse error). Fixed: `_escape()` the backticks in dimension/measure/join
+   `sql` fields while keeping `${CUBE}` interpolation live. **Locked in by two
+   regression tests** (`test_sql_backticks_are_escaped_*`) — these would have
+   caught it pre-deploy.
+
+### Production-hardening notes (deferred, documented)
+
+- **dev mode** bundles the embedded Cube Store so one container can execute
+  queries. It also relaxes JWT verification + exposes the Playground, so the
+  service is kept **private** (IAM-gated). Committed Terraform defaults
+  `cube_dev_mode=false` (secure); the live deploy overrides via gitignored
+  `terraform.tfvars`. For public/prod, deploy a real **Cube Store** cluster and
+  leave dev mode off — that's Phase 5c.
+- **Backend → Cube** auth (header collision between Cloud Run ID token and the
+  Cube JWT) is a Phase 6 concern; the Semantic agent uses `CubeQueryClient`,
+  which works against the offline stub until that's wired.
+
+### Reproducibility additions (for forks)
+
+- `infra/cube/cloudbuild.yaml` + `backend/cloudbuild.yaml` — Cloud Build configs
+  (the backend Dockerfile is at a non-default path).
+- `backend/.gcloudignore` — keeps the build upload small (excludes `.venv`).
+- Terraform `google_project_iam_member.cloudbuild_builder` — grants the Compute
+  Engine default SA the builder role (forks hit a 403 without it).
+- `infra/scripts/cube_smoke.py` — reusable smoke-test seeder.
+
+### Cost of the live deploy
+
+| Resource | Cost |
+|---|---|
+| Cube Cloud Run (scales to zero) | $0 idle |
+| cube-gen job | $0 (pay per run) |
+| Artifact Registry (cube ~1.5 GB + api image) | ~$0.15–0.30/mo |
+| Cloud Build (2 builds) | $0 (free tier) |
+| **Total recurring** | **< $0.50/mo** — inside the $5 guardrail |
+
+---
+
 ## What was NOT done (deliberate)
 
-- **No live deploy.** Building/pushing the Cube + backend images and
-  `terraform apply` with `enable_cube=true` is the checkpoint below.
+- **Production Cube Store** (Phase 5c) — running prod mode publicly requires a
+  separate Cube Store cluster. dev mode + private service is the MVP stand-in.
 - **No real Cube query yet** — the query client returns stubs until Cube is
   deployed and `INSNAV_CUBE_API_URL` is set. Phase 6 wires the Semantic agent.
 - **India fiscal-year custom granularities** — need Cube-side JS; add when the

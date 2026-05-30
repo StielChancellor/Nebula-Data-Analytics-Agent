@@ -66,6 +66,21 @@ variable "enable_cube" {
   description = "Phase 5b: deploy the Cube semantic-layer Cloud Run service + cube-gen job. Turn on after the cube image is built and pushed. Scales to zero ($0 at idle)."
 }
 
+variable "cube_dev_mode" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Run Cube with CUBEJS_DEV_MODE. Dev mode bundles an embedded Cube Store so a
+    SINGLE container can execute queries (no separate Cube Store cluster). It
+    also exposes the Playground and relaxes JWT verification, so the service
+    MUST be kept private (no allUsers invoker) when this is true.
+
+    Secure default is false (production mode). For production with public
+    access, deploy a real Cube Store and leave this false. Set true (via
+    terraform.tfvars) only for a single-container MVP/demo on a private service.
+  EOT
+}
+
 variable "enable_firebase_hosting" {
   type        = bool
   default     = false

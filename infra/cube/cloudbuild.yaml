@@ -1,0 +1,15 @@
+# Cloud Build config for the Cube image.
+#   gcloud builds submit infra/cube \
+#     --config=infra/cube/cloudbuild.yaml \
+#     --substitutions=_IMAGE=us-central1-docker.pkg.dev/insights-navigator-v2/insnav/cube:latest
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+options:
+  logging: CLOUD_LOGGING_ONLY

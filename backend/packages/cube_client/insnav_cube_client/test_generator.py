@@ -1,4 +1,6 @@
 """Unit tests for the Cube schema generator + JS renderer."""
+import re
+
 import pytest
 
 from insnav_cube_client import (
@@ -7,6 +9,26 @@ from insnav_cube_client import (
     cube_name_for_dataset,
     render_to_js,
 )
+
+
+def _no_unescaped_nested_backticks(js: str) -> bool:
+    """
+    Every `sql:` value is a JS template literal (delimited by backticks). The
+    BQ identifier backticks inside MUST be escaped (\\`), otherwise the value
+    backtick closes the template early and Cube fails to compile with a
+    "could not be cloned" DataCloneError. This guards that regression: no
+    `sql:` line may contain an UNescaped backtick between its delimiters.
+    """
+    for line in js.splitlines():
+        m = re.search(r"sql: `(.*)`,?$", line)
+        if not m:
+            continue
+        body = m.group(1)
+        # Walk the body; every backtick must be preceded by a backslash.
+        for i, ch in enumerate(body):
+            if ch == "`" and (i == 0 or body[i - 1] != "\\"):
+                return False
+    return True
 
 
 def _ds(id_: str = "a3f4d2b1c0d9e8f7a3f4d2b1c0d9e8f7", label: str = "Sales 2026") -> dict:
@@ -295,6 +317,36 @@ class TestRenderToJS:
         js = render_to_js(s)
         # Trail back to PRD constraint #2
         assert "Hard constraint #2" in js
+
+    def test_sql_backticks_are_escaped_dimensions_and_measures(self) -> None:
+        """Regression: nested backticks in sql: fields must be escaped, or Cube
+        fails to compile (DataCloneError). Caught only at deploy in Phase 5b."""
+        s = build_cube_schema(
+            dataset=_ds(),
+            columns=[_col("city", "STRING", key_likeness=0.2), _col("revenue", "FLOAT64", key_likeness=0.0)],
+            edges=[],
+        )
+        js = render_to_js(s)
+        assert _no_unescaped_nested_backticks(js), js
+        # And the escaped form is actually present (not just absent of bare ones)
+        assert r"sql: `\`city\``," in js
+        assert r"sql: `\`revenue\``," in js
+
+    def test_sql_backticks_are_escaped_in_joins(self) -> None:
+        ds_id = "aaaa1111aaaa1111aaaa1111aaaa1111"
+        s = build_cube_schema(
+            dataset=_ds(ds_id, "A"),
+            columns=[],
+            edges=[{
+                "id": "e1", "from_dataset": ds_id, "from_column": "gclid",
+                "to_dataset": "BBBBBBBB22222222BBBBBBBB22222222", "to_column": "gclid",
+                "from_distinct_count": 100, "to_distinct_count": 100,
+            }],
+        )
+        js = render_to_js(s)
+        assert _no_unescaped_nested_backticks(js), js
+        # ${CUBE} interpolation stays LIVE (not escaped) so Cube fills it in.
+        assert "${CUBE}" in js
 
 
 class TestRoundtripWithComplexSchema:
