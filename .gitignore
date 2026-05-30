@@ -81,8 +81,10 @@ htmlcov/
 infra/terraform/.terraform/
 # .terraform.lock.hcl IS committed per Terraform's recommendation — pins
 # provider versions so the next clone gets the same plan output.
-infra/terraform/terraform.tfstate
-infra/terraform/terraform.tfstate.backup
+# State (incl. timestamped backups like terraform.tfstate.1700000000.backup)
+# must NEVER be committed — it can contain sensitive values.
+**/*.tfstate
+**/*.tfstate.*
 infra/terraform/terraform.tfvars
 infra/terraform/*.tfplan
 infra/terraform/crash.log
