@@ -6,9 +6,17 @@ The whole platform is deployed and answering questions on `insights-navigator-v2
 
 | Service | URL | Notes |
 |---|---|---|
+| **Frontend (SPA)** | **`https://insnav-frontend-q3rm3dw2tq-uc.a.run.app`** | **Open this.** nginx static, public. Calls the api_gateway cross-origin (CORS). |
 | API gateway | `https://insnav-api-gateway-q3rm3dw2tq-uc.a.run.app` | Public; does its own JWT auth. Brain: Gemini via Vertex ADC. |
 | Cube semantic layer | `https://insnav-cube-q3rm3dw2tq-uc.a.run.app` | Prod mode + Cube Store sidecar; JWT-enforced. |
 | cube-gen job | `insnav-cube-gen` | Full Cube-model rebuild. |
+
+**Open the frontend URL** → sign in (`admin@insnav.local` + the bootstrap
+password from Secret Manager) → **Ask** tab → pick a brain → "total revenue by
+city". The frontend is its own Cloud Run service (nginx), built with
+`VITE_API_BASE` baked to the api_gateway URL; bearer-token auth (no cookies), so
+plain `*` CORS works. Firebase Hosting remains the production CDN option (config
+scaffolded; one `firebase login && firebase deploy` away).
 
 ## The proof — a real chat answer, live
 

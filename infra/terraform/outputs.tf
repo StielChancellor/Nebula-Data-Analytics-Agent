@@ -43,6 +43,11 @@ output "cube_url" {
   description = "Cube REST API base URL (set as INSNAV_CUBE_API_URL on the backend)"
 }
 
+output "frontend_url" {
+  value       = var.enable_frontend ? google_cloud_run_v2_service.frontend[0].uri : null
+  description = "Public URL of the deployed frontend SPA"
+}
+
 output "firebase_web_api_key" {
   value       = var.enable_identity_platform ? google_apikeys_key.firebase_web[0].key_string : null
   description = "Browser API key for the frontend's VITE_FIREBASE_API_KEY"

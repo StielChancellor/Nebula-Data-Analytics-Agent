@@ -72,6 +72,12 @@ variable "enable_orchestrator" {
   description = "Deploy the separate orchestrator service. The agent swarm runs in-process in api_gateway (PRD D5), so this stays off until the swarm is extracted + its image built."
 }
 
+variable "enable_frontend" {
+  type        = bool
+  default     = false
+  description = "Deploy the static frontend (nginx) as its own Cloud Run service. Turn on after the frontend image is built. Public + scales to zero."
+}
+
 variable "bootstrap_admin_email" {
   type        = string
   default     = "admin@insnav.local"

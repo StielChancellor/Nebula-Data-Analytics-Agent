@@ -1,0 +1,2665 @@
+{
+  "version": 4,
+  "terraform_version": "1.15.5",
+  "serial": 103,
+  "lineage": "88e08f4f-6125-16be-f1ef-1f3dfb3e3eb1",
+  "outputs": {
+    "api_gateway_url": {
+      "value": "https://insnav-api-gateway-q3rm3dw2tq-uc.a.run.app",
+      "type": "string"
+    },
+    "artifact_registry_url": {
+      "value": "us-central1-docker.pkg.dev/insights-navigator-v2/insnav",
+      "type": "string"
+    },
+    "bq_datasets": {
+      "value": {
+        "audit": "audit",
+        "datasets": "datasets"
+      },
+      "type": [
+        "object",
+        {
+          "audit": "string",
+          "datasets": "string"
+        }
+      ]
+    },
+    "cube_url": {
+      "value": "https://insnav-cube-q3rm3dw2tq-uc.a.run.app",
+      "type": "string"
+    },
+    "firebase_web_api_key": {
+      "value": "AIzaSyCf0oyga7f1KD_ISM5fUpbfjJzM7fVk5fg",
+      "type": "string",
+      "sensitive": true
+    },
+    "frontend_url": {
+      "value": "https://insnav-frontend-q3rm3dw2tq-uc.a.run.app",
+      "type": "string"
+    },
+    "project_id": {
+      "value": "insights-navigator-v2",
+      "type": "string"
+    },
+    "service_accounts": {
+      "value": {
+        "api_gateway": "insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+        "compute_sandbox": "insnav-compute-sandbox@insights-navigator-v2.iam.gserviceaccount.com",
+        "cube": "insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+        "orchestrator": "insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com"
+      },
+      "type": [
+        "object",
+        {
+          "api_gateway": "string",
+          "compute_sandbox": "string",
+          "cube": "string",
+          "orchestrator": "string"
+        }
+      ]
+    },
+    "staging_bucket": {
+      "value": "insights-navigator-v2-staging",
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "mode": "data",
+      "type": "google_project",
+      "name": "this",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "auto_create_network": null,
+            "billing_account": null,
+            "deletion_policy": "PREVENT",
+            "effective_labels": {
+              "firebase": "enabled",
+              "firebase-core": "disabled"
+            },
+            "folder_id": "",
+            "id": "projects/insights-navigator-v2",
+            "labels": {
+              "firebase": "enabled",
+              "firebase-core": "disabled"
+            },
+            "name": "insights-navigator-v2",
+            "number": "135515666131",
+            "org_id": "179504173356",
+            "project_id": "insights-navigator-v2",
+            "tags": null,
+            "terraform_labels": {
+              "firebase": "enabled",
+              "firebase-core": "disabled"
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_apikeys_key",
+      "name": "firebase_web",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "display_name": "Insights Navigator — Firebase web API key",
+            "id": "projects/insights-navigator-v2/locations/global/keys/insnav-firebase-web",
+            "key_string": "AIzaSyCf0oyga7f1KD_ISM5fUpbfjJzM7fVk5fg",
+            "name": "insnav-firebase-web",
+            "project": "insights-navigator-v2",
+            "restrictions": [
+              {
+                "android_key_restrictions": [],
+                "api_targets": [
+                  {
+                    "methods": [],
+                    "service": "identitytoolkit.googleapis.com"
+                  }
+                ],
+                "browser_key_restrictions": [
+                  {
+                    "allowed_referrers": [
+                      "*"
+                    ]
+                  }
+                ],
+                "ios_key_restrictions": [],
+                "server_key_restrictions": []
+              }
+            ],
+            "service_account_email": "",
+            "timeouts": null,
+            "uid": "23c96efc-509b-4e69-a88a-272799ed9603"
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "key_string"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_artifact_registry_repository",
+      "name": "insnav",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "cleanup_policies": [],
+            "cleanup_policy_dry_run": false,
+            "create_time": "2026-05-28T20:42:10.171595Z",
+            "description": "Docker images for Insights Navigator V2.0 services",
+            "docker_config": [],
+            "effective_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "format": "DOCKER",
+            "id": "projects/insights-navigator-v2/locations/us-central1/repositories/insnav",
+            "kms_key_name": "",
+            "labels": {
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "location": "us-central1",
+            "maven_config": [],
+            "mode": "STANDARD_REPOSITORY",
+            "name": "insnav",
+            "project": "insights-navigator-v2",
+            "remote_repository_config": [],
+            "repository_id": "insnav",
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "timeouts": null,
+            "update_time": "2026-05-30T06:46:39.335215Z",
+            "virtual_repository_config": [],
+            "vulnerability_scanning_config": [
+              {
+                "enablement_config": "",
+                "enablement_state": "SCANNING_DISABLED",
+                "enablement_state_reason": "API containerscanning.googleapis.com is not enabled."
+              }
+            ]
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_bigquery_dataset",
+      "name": "audit",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "access": [
+              {
+                "condition": [],
+                "dataset": [],
+                "domain": "",
+                "group_by_email": "",
+                "iam_member": "",
+                "role": "OWNER",
+                "routine": [],
+                "special_group": "",
+                "user_by_email": "erevcom@gmail.com",
+                "view": []
+              },
+              {
+                "condition": [],
+                "dataset": [],
+                "domain": "",
+                "group_by_email": "",
+                "iam_member": "",
+                "role": "OWNER",
+                "routine": [],
+                "special_group": "projectOwners",
+                "user_by_email": "",
+                "view": []
+              },
+              {
+                "condition": [],
+                "dataset": [],
+                "domain": "",
+                "group_by_email": "",
+                "iam_member": "",
+                "role": "READER",
+                "routine": [],
+                "special_group": "projectReaders",
+                "user_by_email": "",
+                "view": []
+              },
+              {
+                "condition": [],
+                "dataset": [],
+                "domain": "",
+                "group_by_email": "",
+                "iam_member": "",
+                "role": "WRITER",
+                "routine": [],
+                "special_group": "projectWriters",
+                "user_by_email": "",
+                "view": []
+              }
+            ],
+            "creation_time": 1780000921176,
+            "dataset_id": "audit",
+            "default_collation": "",
+            "default_encryption_configuration": [],
+            "default_partition_expiration_ms": 0,
+            "default_table_expiration_ms": 0,
+            "delete_contents_on_destroy": false,
+            "description": "Append-only audit log of every query (PRD § Features lifted from Metabase)",
+            "effective_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "etag": "ARgae12IqfuZvVpoHEGQAw==",
+            "external_catalog_dataset_options": [],
+            "external_dataset_reference": [],
+            "friendly_name": "",
+            "id": "projects/insights-navigator-v2/datasets/audit",
+            "is_case_insensitive": false,
+            "labels": {
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "last_modified_time": 1780000921176,
+            "location": "US",
+            "max_time_travel_hours": "168",
+            "project": "insights-navigator-v2",
+            "resource_tags": {},
+            "self_link": "https://bigquery.googleapis.com/bigquery/v2/projects/insights-navigator-v2/datasets/audit",
+            "storage_billing_model": "",
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_bigquery_dataset",
+      "name": "datasets",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "access": [
+              {
+                "condition": [],
+                "dataset": [],
+                "domain": "",
+                "group_by_email": "",
+                "iam_member": "",
+                "role": "OWNER",
+                "routine": [],
+                "special_group": "",
+                "user_by_email": "erevcom@gmail.com",
+                "view": []
+              },
+              {
+                "condition": [],
+                "dataset": [],
+                "domain": "",
+                "group_by_email": "",
+                "iam_member": "",
+                "role": "OWNER",
+                "routine": [],
+                "special_group": "projectOwners",
+                "user_by_email": "",
+                "view": []
+              },
+              {
+                "condition": [],
+                "dataset": [],
+                "domain": "",
+                "group_by_email": "",
+                "iam_member": "",
+                "role": "READER",
+                "routine": [],
+                "special_group": "projectReaders",
+                "user_by_email": "",
+                "view": []
+              },
+              {
+                "condition": [],
+                "dataset": [],
+                "domain": "",
+                "group_by_email": "",
+                "iam_member": "",
+                "role": "WRITER",
+                "routine": [],
+                "special_group": "projectWriters",
+                "user_by_email": "",
+                "view": []
+              }
+            ],
+            "creation_time": 1780000920944,
+            "dataset_id": "datasets",
+            "default_collation": "",
+            "default_encryption_configuration": [],
+            "default_partition_expiration_ms": 0,
+            "default_table_expiration_ms": 0,
+            "delete_contents_on_destroy": false,
+            "description": "Cleaned, modeled datasets (L1+) the agent queries via Cube",
+            "effective_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "etag": "tmZheJMavqf/B2MCuuE9sg==",
+            "external_catalog_dataset_options": [],
+            "external_dataset_reference": [],
+            "friendly_name": "",
+            "id": "projects/insights-navigator-v2/datasets/datasets",
+            "is_case_insensitive": false,
+            "labels": {
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "last_modified_time": 1780000920944,
+            "location": "US",
+            "max_time_travel_hours": "168",
+            "project": "insights-navigator-v2",
+            "resource_tags": {},
+            "self_link": "https://bigquery.googleapis.com/bigquery/v2/projects/insights-navigator-v2/datasets/datasets",
+            "storage_billing_model": "",
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_cloud_run_v2_job",
+      "name": "cube_gen",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "annotations": {},
+            "binary_authorization": [],
+            "client": "",
+            "client_version": "",
+            "conditions": [],
+            "create_time": "2026-05-30T04:31:17.169069Z",
+            "creator": "erevcom@gmail.com",
+            "delete_time": "",
+            "deletion_protection": true,
+            "effective_annotations": {},
+            "effective_labels": {
+              "goog-terraform-provisioned": "true"
+            },
+            "etag": "\"CJXQ6dAGEMiTz1A/cHJvamVjdHMvaW5zaWdodHMtbmF2aWdhdG9yLXYyL2xvY2F0aW9ucy91cy1jZW50cmFsMS9qb2JzL2luc25hdi1jdWJlLWdlbg\"",
+            "execution_count": 0,
+            "expire_time": "",
+            "generation": "1",
+            "id": "projects/insights-navigator-v2/locations/us-central1/jobs/insnav-cube-gen",
+            "labels": {},
+            "last_modifier": "erevcom@gmail.com",
+            "latest_created_execution": [],
+            "launch_stage": "GA",
+            "location": "us-central1",
+            "name": "insnav-cube-gen",
+            "observed_generation": "1",
+            "project": "insights-navigator-v2",
+            "reconciling": false,
+            "template": [
+              {
+                "annotations": {},
+                "labels": {},
+                "parallelism": 0,
+                "task_count": 1,
+                "template": [
+                  {
+                    "containers": [
+                      {
+                        "args": [],
+                        "command": [
+                          "python",
+                          "-m",
+                          "services.cube_gen.app.main"
+                        ],
+                        "depends_on": [],
+                        "env": [
+                          {
+                            "name": "INSNAV_CUBE_MODEL_BUCKET",
+                            "value": "insights-navigator-v2-staging",
+                            "value_source": []
+                          },
+                          {
+                            "name": "INSNAV_CUBE_MODEL_PREFIX",
+                            "value": "cube-model",
+                            "value_source": []
+                          }
+                        ],
+                        "image": "us-central1-docker.pkg.dev/insights-navigator-v2/insnav/api:latest",
+                        "name": "",
+                        "ports": [],
+                        "resources": [
+                          {
+                            "limits": {
+                              "cpu": "1",
+                              "memory": "512Mi"
+                            }
+                          }
+                        ],
+                        "startup_probe": [],
+                        "volume_mounts": [],
+                        "working_dir": ""
+                      }
+                    ],
+                    "encryption_key": "",
+                    "execution_environment": "EXECUTION_ENVIRONMENT_GEN2",
+                    "gpu_zonal_redundancy_disabled": false,
+                    "max_retries": 3,
+                    "node_selector": [],
+                    "service_account": "insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+                    "timeout": "600s",
+                    "volumes": [],
+                    "vpc_access": []
+                  }
+                ]
+              }
+            ],
+            "terminal_condition": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T04:31:19.049600Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "Ready"
+              }
+            ],
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true"
+            },
+            "timeouts": null,
+            "uid": "b2951177-383f-430f-a8af-5476e7b22475",
+            "update_time": "2026-05-30T04:31:17.169069Z"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_artifact_registry_repository.insnav",
+            "google_project_service.enabled",
+            "google_service_account.api_gateway"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_cloud_run_v2_service",
+      "name": "api_gateway",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "annotations": {},
+            "binary_authorization": [],
+            "build_config": [],
+            "client": "",
+            "client_version": "",
+            "conditions": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T06:11:36.126536Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "RoutesReady"
+              },
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T06:11:27.770822Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "ConfigurationsReady"
+              }
+            ],
+            "create_time": "2026-05-30T06:01:38.335707Z",
+            "creator": "erevcom@gmail.com",
+            "custom_audiences": [],
+            "delete_time": "",
+            "deletion_protection": true,
+            "description": "",
+            "effective_annotations": {},
+            "effective_labels": {
+              "goog-terraform-provisioned": "true"
+            },
+            "etag": "\"CPyP6tAGELD601I/cHJvamVjdHMvaW5zaWdodHMtbmF2aWdhdG9yLXYyL2xvY2F0aW9ucy91cy1jZW50cmFsMS9zZXJ2aWNlcy9pbnNuYXYtYXBpLWdhdGV3YXk\"",
+            "expire_time": "",
+            "generation": "3",
+            "id": "projects/insights-navigator-v2/locations/us-central1/services/insnav-api-gateway",
+            "ingress": "INGRESS_TRAFFIC_ALL",
+            "invoker_iam_disabled": false,
+            "labels": {},
+            "last_modifier": "erevcom@gmail.com",
+            "latest_created_revision": "projects/insights-navigator-v2/locations/us-central1/services/insnav-api-gateway/revisions/insnav-api-gateway-00002-2cm",
+            "latest_ready_revision": "projects/insights-navigator-v2/locations/us-central1/services/insnav-api-gateway/revisions/insnav-api-gateway-00002-2cm",
+            "launch_stage": "GA",
+            "location": "us-central1",
+            "name": "insnav-api-gateway",
+            "observed_generation": "3",
+            "project": "insights-navigator-v2",
+            "reconciling": false,
+            "scaling": [
+              {
+                "manual_instance_count": 0,
+                "min_instance_count": 0,
+                "scaling_mode": ""
+              }
+            ],
+            "template": [
+              {
+                "annotations": {},
+                "containers": [
+                  {
+                    "args": [],
+                    "base_image_uri": "",
+                    "build_info": [],
+                    "command": [],
+                    "depends_on": [],
+                    "env": [
+                      {
+                        "name": "BOOTSTRAP_ADMIN_EMAIL",
+                        "value": "admin@insnav.local",
+                        "value_source": []
+                      },
+                      {
+                        "name": "BOOTSTRAP_ADMIN_PASSWORD",
+                        "value": "",
+                        "value_source": [
+                          {
+                            "secret_key_ref": [
+                              {
+                                "secret": "insnav-bootstrap-admin-password",
+                                "version": "latest"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "name": "INSNAV_CORS_ORIGINS",
+                        "value": "*",
+                        "value_source": []
+                      },
+                      {
+                        "name": "INSNAV_CUBE_API_SECRET",
+                        "value": "",
+                        "value_source": [
+                          {
+                            "secret_key_ref": [
+                              {
+                                "secret": "cube-api-secret",
+                                "version": "latest"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "name": "INSNAV_CUBE_API_URL",
+                        "value": "https://insnav-cube-q3rm3dw2tq-uc.a.run.app",
+                        "value_source": []
+                      },
+                      {
+                        "name": "INSNAV_GCP_PROJECT",
+                        "value": "insights-navigator-v2",
+                        "value_source": []
+                      },
+                      {
+                        "name": "INSNAV_JWT_SECRET",
+                        "value": "",
+                        "value_source": [
+                          {
+                            "secret_key_ref": [
+                              {
+                                "secret": "insnav-jwt-secret",
+                                "version": "latest"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "name": "INSNAV_LLM_MODEL",
+                        "value": "gemini-2.5-pro",
+                        "value_source": []
+                      },
+                      {
+                        "name": "INSNAV_LLM_PRIMARY",
+                        "value": "gemini",
+                        "value_source": []
+                      }
+                    ],
+                    "image": "us-central1-docker.pkg.dev/insights-navigator-v2/insnav/api:latest",
+                    "liveness_probe": [],
+                    "name": "",
+                    "ports": [
+                      {
+                        "container_port": 8080,
+                        "name": "http1"
+                      }
+                    ],
+                    "resources": [
+                      {
+                        "cpu_idle": false,
+                        "limits": {
+                          "cpu": "1",
+                          "memory": "1Gi"
+                        },
+                        "startup_cpu_boost": true
+                      }
+                    ],
+                    "startup_probe": [
+                      {
+                        "failure_threshold": 1,
+                        "grpc": [],
+                        "http_get": [],
+                        "initial_delay_seconds": 0,
+                        "period_seconds": 240,
+                        "tcp_socket": [
+                          {
+                            "port": 8080
+                          }
+                        ],
+                        "timeout_seconds": 240
+                      }
+                    ],
+                    "volume_mounts": [],
+                    "working_dir": ""
+                  }
+                ],
+                "encryption_key": "",
+                "execution_environment": "",
+                "gpu_zonal_redundancy_disabled": false,
+                "labels": {},
+                "max_instance_request_concurrency": 80,
+                "node_selector": [],
+                "revision": "",
+                "scaling": [
+                  {
+                    "max_instance_count": 5,
+                    "min_instance_count": 0
+                  }
+                ],
+                "service_account": "insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+                "session_affinity": false,
+                "timeout": "300s",
+                "volumes": [],
+                "vpc_access": []
+              }
+            ],
+            "terminal_condition": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T06:11:36.171279Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "Ready"
+              }
+            ],
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true"
+            },
+            "timeouts": null,
+            "traffic": [
+              {
+                "percent": 100,
+                "revision": "",
+                "tag": "",
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+              }
+            ],
+            "traffic_statuses": [
+              {
+                "percent": 100,
+                "revision": "",
+                "tag": "",
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
+                "uri": ""
+              }
+            ],
+            "uid": "ff070eb9-2173-4662-8007-6be4d5911302",
+            "update_time": "2026-05-30T06:47:24.173342Z",
+            "uri": "https://insnav-api-gateway-q3rm3dw2tq-uc.a.run.app",
+            "urls": [
+              "https://insnav-api-gateway-135515666131.us-central1.run.app",
+              "https://insnav-api-gateway-q3rm3dw2tq-uc.a.run.app"
+            ]
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_artifact_registry_repository.insnav",
+            "google_cloud_run_v2_service.cube",
+            "google_project_service.enabled",
+            "google_secret_manager_secret.bootstrap_admin_password",
+            "google_secret_manager_secret.cube_api_secret",
+            "google_secret_manager_secret.jwt",
+            "google_service_account.api_gateway",
+            "google_service_account.cube"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_cloud_run_v2_service",
+      "name": "cube",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "annotations": {},
+            "binary_authorization": [],
+            "build_config": [],
+            "client": "",
+            "client_version": "",
+            "conditions": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T05:35:11.505030Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "RoutesReady"
+              },
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T05:34:46.775280Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "ConfigurationsReady"
+              }
+            ],
+            "create_time": "2026-05-30T04:31:17.175377Z",
+            "creator": "erevcom@gmail.com",
+            "custom_audiences": [],
+            "delete_time": "",
+            "deletion_protection": true,
+            "description": "",
+            "effective_annotations": {},
+            "effective_labels": {
+              "goog-terraform-provisioned": "true",
+              "secretbump": "v2"
+            },
+            "etag": "\"CPbt6dAGEODN4ZMC/cHJvamVjdHMvaW5zaWdodHMtbmF2aWdhdG9yLXYyL2xvY2F0aW9ucy91cy1jZW50cmFsMS9zZXJ2aWNlcy9pbnNuYXYtY3ViZQ\"",
+            "expire_time": "",
+            "generation": "9",
+            "id": "projects/insights-navigator-v2/locations/us-central1/services/insnav-cube",
+            "ingress": "INGRESS_TRAFFIC_ALL",
+            "invoker_iam_disabled": false,
+            "labels": {},
+            "last_modifier": "erevcom@gmail.com",
+            "latest_created_revision": "projects/insights-navigator-v2/locations/us-central1/services/insnav-cube/revisions/insnav-cube-00009-56w",
+            "latest_ready_revision": "projects/insights-navigator-v2/locations/us-central1/services/insnav-cube/revisions/insnav-cube-00009-56w",
+            "launch_stage": "GA",
+            "location": "us-central1",
+            "name": "insnav-cube",
+            "observed_generation": "9",
+            "project": "insights-navigator-v2",
+            "reconciling": false,
+            "scaling": [
+              {
+                "manual_instance_count": 0,
+                "min_instance_count": 0,
+                "scaling_mode": ""
+              }
+            ],
+            "template": [
+              {
+                "annotations": {},
+                "containers": [
+                  {
+                    "args": [],
+                    "base_image_uri": "",
+                    "build_info": [],
+                    "command": [],
+                    "depends_on": [],
+                    "env": [
+                      {
+                        "name": "CUBEJS_API_SECRET",
+                        "value": "",
+                        "value_source": [
+                          {
+                            "secret_key_ref": [
+                              {
+                                "secret": "cube-api-secret",
+                                "version": "latest"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "name": "CUBEJS_CUBESTORE_HOST",
+                        "value": "localhost",
+                        "value_source": []
+                      },
+                      {
+                        "name": "CUBEJS_CUBESTORE_PORT",
+                        "value": "3030",
+                        "value_source": []
+                      },
+                      {
+                        "name": "CUBEJS_DB_BQ_PROJECT_ID",
+                        "value": "insights-navigator-v2",
+                        "value_source": []
+                      },
+                      {
+                        "name": "CUBEJS_DB_TYPE",
+                        "value": "bigquery",
+                        "value_source": []
+                      },
+                      {
+                        "name": "CUBEJS_DEV_MODE",
+                        "value": "false",
+                        "value_source": []
+                      },
+                      {
+                        "name": "INSNAV_CUBE_MODEL_BUCKET",
+                        "value": "insights-navigator-v2-staging",
+                        "value_source": []
+                      },
+                      {
+                        "name": "INSNAV_CUBE_MODEL_PREFIX",
+                        "value": "cube-model",
+                        "value_source": []
+                      }
+                    ],
+                    "image": "us-central1-docker.pkg.dev/insights-navigator-v2/insnav/cube:latest",
+                    "liveness_probe": [],
+                    "name": "",
+                    "ports": [
+                      {
+                        "container_port": 8080,
+                        "name": "http1"
+                      }
+                    ],
+                    "resources": [
+                      {
+                        "cpu_idle": false,
+                        "limits": {
+                          "cpu": "1",
+                          "memory": "1Gi"
+                        },
+                        "startup_cpu_boost": true
+                      }
+                    ],
+                    "startup_probe": [
+                      {
+                        "failure_threshold": 13,
+                        "grpc": [],
+                        "http_get": [],
+                        "initial_delay_seconds": 20,
+                        "period_seconds": 10,
+                        "tcp_socket": [
+                          {
+                            "port": 8080
+                          }
+                        ],
+                        "timeout_seconds": 5
+                      }
+                    ],
+                    "volume_mounts": [],
+                    "working_dir": ""
+                  },
+                  {
+                    "args": [],
+                    "base_image_uri": "",
+                    "build_info": [],
+                    "command": [],
+                    "depends_on": [],
+                    "env": [
+                      {
+                        "name": "CUBESTORE_SERVER_NAME",
+                        "value": "localhost:3030",
+                        "value_source": []
+                      }
+                    ],
+                    "image": "cubejs/cubestore:latest",
+                    "liveness_probe": [],
+                    "name": "cubestore",
+                    "ports": [],
+                    "resources": [
+                      {
+                        "cpu_idle": false,
+                        "limits": {
+                          "cpu": "1",
+                          "memory": "1Gi"
+                        },
+                        "startup_cpu_boost": false
+                      }
+                    ],
+                    "startup_probe": [],
+                    "volume_mounts": [],
+                    "working_dir": ""
+                  }
+                ],
+                "encryption_key": "",
+                "execution_environment": "",
+                "gpu_zonal_redundancy_disabled": false,
+                "labels": {},
+                "max_instance_request_concurrency": 80,
+                "node_selector": [],
+                "revision": "",
+                "scaling": [
+                  {
+                    "max_instance_count": 1,
+                    "min_instance_count": 0
+                  }
+                ],
+                "service_account": "insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+                "session_affinity": false,
+                "timeout": "300s",
+                "volumes": [],
+                "vpc_access": []
+              }
+            ],
+            "terminal_condition": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T05:35:11.543849Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "Ready"
+              }
+            ],
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true"
+            },
+            "timeouts": null,
+            "traffic": [
+              {
+                "percent": 100,
+                "revision": "",
+                "tag": "",
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+              }
+            ],
+            "traffic_statuses": [
+              {
+                "percent": 100,
+                "revision": "",
+                "tag": "",
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
+                "uri": ""
+              }
+            ],
+            "uid": "a09f4380-56e7-4331-9166-d72a7657581f",
+            "update_time": "2026-05-30T05:34:46.578316Z",
+            "uri": "https://insnav-cube-q3rm3dw2tq-uc.a.run.app",
+            "urls": [
+              "https://insnav-cube-135515666131.us-central1.run.app",
+              "https://insnav-cube-q3rm3dw2tq-uc.a.run.app"
+            ]
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_artifact_registry_repository.insnav",
+            "google_project_service.enabled",
+            "google_secret_manager_secret.cube_api_secret",
+            "google_service_account.cube"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_cloud_run_v2_service",
+      "name": "frontend",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "annotations": null,
+            "binary_authorization": [],
+            "build_config": [],
+            "client": "",
+            "client_version": "",
+            "conditions": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T06:48:28.368538Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "RoutesReady"
+              },
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T06:48:25.043960Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "ConfigurationsReady"
+              }
+            ],
+            "create_time": "2026-05-30T06:48:22.924151Z",
+            "creator": "erevcom@gmail.com",
+            "custom_audiences": null,
+            "delete_time": "",
+            "deletion_protection": false,
+            "description": "",
+            "effective_annotations": {},
+            "effective_labels": {
+              "goog-terraform-provisioned": "true"
+            },
+            "etag": "\"CLaQ6tAGENjZ1bgD/cHJvamVjdHMvaW5zaWdodHMtbmF2aWdhdG9yLXYyL2xvY2F0aW9ucy91cy1jZW50cmFsMS9zZXJ2aWNlcy9pbnNuYXYtZnJvbnRlbmQ\"",
+            "expire_time": "",
+            "generation": "1",
+            "id": "projects/insights-navigator-v2/locations/us-central1/services/insnav-frontend",
+            "ingress": "INGRESS_TRAFFIC_ALL",
+            "invoker_iam_disabled": false,
+            "labels": null,
+            "last_modifier": "erevcom@gmail.com",
+            "latest_created_revision": "projects/insights-navigator-v2/locations/us-central1/services/insnav-frontend/revisions/insnav-frontend-00001-5zt",
+            "latest_ready_revision": "projects/insights-navigator-v2/locations/us-central1/services/insnav-frontend/revisions/insnav-frontend-00001-5zt",
+            "launch_stage": "GA",
+            "location": "us-central1",
+            "name": "insnav-frontend",
+            "observed_generation": "1",
+            "project": "insights-navigator-v2",
+            "reconciling": false,
+            "scaling": [
+              {
+                "manual_instance_count": 0,
+                "min_instance_count": 0,
+                "scaling_mode": ""
+              }
+            ],
+            "template": [
+              {
+                "annotations": null,
+                "containers": [
+                  {
+                    "args": null,
+                    "base_image_uri": "",
+                    "build_info": [],
+                    "command": null,
+                    "depends_on": null,
+                    "env": [],
+                    "image": "us-central1-docker.pkg.dev/insights-navigator-v2/insnav/frontend:latest",
+                    "liveness_probe": [],
+                    "name": "",
+                    "ports": [
+                      {
+                        "container_port": 8080,
+                        "name": "http1"
+                      }
+                    ],
+                    "resources": [
+                      {
+                        "cpu_idle": false,
+                        "limits": {
+                          "cpu": "1",
+                          "memory": "512Mi"
+                        },
+                        "startup_cpu_boost": false
+                      }
+                    ],
+                    "startup_probe": [
+                      {
+                        "failure_threshold": 1,
+                        "grpc": [],
+                        "http_get": [],
+                        "initial_delay_seconds": 0,
+                        "period_seconds": 240,
+                        "tcp_socket": [
+                          {
+                            "port": 8080
+                          }
+                        ],
+                        "timeout_seconds": 240
+                      }
+                    ],
+                    "volume_mounts": [],
+                    "working_dir": ""
+                  }
+                ],
+                "encryption_key": "",
+                "execution_environment": "",
+                "gpu_zonal_redundancy_disabled": false,
+                "labels": null,
+                "max_instance_request_concurrency": 80,
+                "node_selector": [],
+                "revision": "",
+                "scaling": [
+                  {
+                    "max_instance_count": 3,
+                    "min_instance_count": 0
+                  }
+                ],
+                "service_account": "135515666131-compute@developer.gserviceaccount.com",
+                "session_affinity": false,
+                "timeout": "300s",
+                "volumes": [],
+                "vpc_access": []
+              }
+            ],
+            "terminal_condition": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T06:48:28.411831Z",
+                "message": "",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_SUCCEEDED",
+                "type": "Ready"
+              }
+            ],
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true"
+            },
+            "timeouts": null,
+            "traffic": [
+              {
+                "percent": 100,
+                "revision": "",
+                "tag": "",
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+              }
+            ],
+            "traffic_statuses": [
+              {
+                "percent": 100,
+                "revision": "",
+                "tag": "",
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
+                "uri": ""
+              }
+            ],
+            "uid": "c601cd1e-b026-425b-beb6-916d8d74c2cf",
+            "update_time": "2026-05-30T06:48:22.924151Z",
+            "uri": "https://insnav-frontend-q3rm3dw2tq-uc.a.run.app",
+            "urls": [
+              "https://insnav-frontend-135515666131.us-central1.run.app",
+              "https://insnav-frontend-q3rm3dw2tq-uc.a.run.app"
+            ]
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_artifact_registry_repository.insnav",
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_cloud_run_v2_service",
+      "name": "orchestrator",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "status": "tainted",
+          "schema_version": 0,
+          "attributes": {
+            "annotations": {},
+            "binary_authorization": [],
+            "build_config": [],
+            "client": "",
+            "client_version": "",
+            "conditions": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T06:01:36.372056Z",
+                "message": "Image 'us-central1-docker.pkg.dev/insights-navigator-v2/insnav/orchestrator:latest' not found.",
+                "reason": "REVISION_FAILED",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_FAILED",
+                "type": "RoutesReady"
+              },
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T06:01:36.344354Z",
+                "message": "Image 'us-central1-docker.pkg.dev/insights-navigator-v2/insnav/orchestrator:latest' not found.",
+                "reason": "",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_FAILED",
+                "type": "ConfigurationsReady"
+              }
+            ],
+            "create_time": "2026-05-30T06:01:36.004686Z",
+            "creator": "erevcom@gmail.com",
+            "custom_audiences": [],
+            "delete_time": "",
+            "deletion_protection": true,
+            "description": "",
+            "effective_annotations": {},
+            "effective_labels": {
+              "goog-terraform-provisioned": "true"
+            },
+            "etag": "\"CMD66dAGELCBngI/cHJvamVjdHMvaW5zaWdodHMtbmF2aWdhdG9yLXYyL2xvY2F0aW9ucy91cy1jZW50cmFsMS9zZXJ2aWNlcy9pbnNuYXYtb3JjaGVzdHJhdG9y\"",
+            "expire_time": "",
+            "generation": "1",
+            "id": "projects/insights-navigator-v2/locations/us-central1/services/insnav-orchestrator",
+            "ingress": "INGRESS_TRAFFIC_ALL",
+            "invoker_iam_disabled": false,
+            "labels": {},
+            "last_modifier": "erevcom@gmail.com",
+            "latest_created_revision": "projects/insights-navigator-v2/locations/us-central1/services/insnav-orchestrator/revisions/insnav-orchestrator-00001-dwd",
+            "latest_ready_revision": "",
+            "launch_stage": "GA",
+            "location": "us-central1",
+            "name": "insnav-orchestrator",
+            "observed_generation": "1",
+            "project": "insights-navigator-v2",
+            "reconciling": false,
+            "scaling": [
+              {
+                "manual_instance_count": 0,
+                "min_instance_count": 0,
+                "scaling_mode": ""
+              }
+            ],
+            "template": [
+              {
+                "annotations": {},
+                "containers": [
+                  {
+                    "args": [],
+                    "base_image_uri": "",
+                    "build_info": [],
+                    "command": [],
+                    "depends_on": [],
+                    "env": [],
+                    "image": "us-central1-docker.pkg.dev/insights-navigator-v2/insnav/orchestrator:latest",
+                    "liveness_probe": [],
+                    "name": "",
+                    "ports": [
+                      {
+                        "container_port": 8080,
+                        "name": "http1"
+                      }
+                    ],
+                    "resources": [
+                      {
+                        "cpu_idle": false,
+                        "limits": {
+                          "cpu": "2",
+                          "memory": "1Gi"
+                        },
+                        "startup_cpu_boost": false
+                      }
+                    ],
+                    "startup_probe": [
+                      {
+                        "failure_threshold": 1,
+                        "grpc": [],
+                        "http_get": [],
+                        "initial_delay_seconds": 0,
+                        "period_seconds": 240,
+                        "tcp_socket": [
+                          {
+                            "port": 8080
+                          }
+                        ],
+                        "timeout_seconds": 240
+                      }
+                    ],
+                    "volume_mounts": [],
+                    "working_dir": ""
+                  }
+                ],
+                "encryption_key": "",
+                "execution_environment": "",
+                "gpu_zonal_redundancy_disabled": false,
+                "labels": {},
+                "max_instance_request_concurrency": 160,
+                "node_selector": [],
+                "revision": "",
+                "scaling": [
+                  {
+                    "max_instance_count": 1,
+                    "min_instance_count": 1
+                  }
+                ],
+                "service_account": "insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+                "session_affinity": false,
+                "timeout": "300s",
+                "volumes": [],
+                "vpc_access": []
+              }
+            ],
+            "terminal_condition": [
+              {
+                "execution_reason": "",
+                "last_transition_time": "2026-05-30T06:01:36.372056Z",
+                "message": "Image 'us-central1-docker.pkg.dev/insights-navigator-v2/insnav/orchestrator:latest' not found.",
+                "reason": "REVISION_FAILED",
+                "revision_reason": "",
+                "severity": "",
+                "state": "CONDITION_FAILED",
+                "type": "Ready"
+              }
+            ],
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true"
+            },
+            "timeouts": null,
+            "traffic": [
+              {
+                "percent": 100,
+                "revision": "",
+                "tag": "",
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+              }
+            ],
+            "traffic_statuses": [],
+            "uid": "0ba61228-0736-45ff-a75f-8d81890a828b",
+            "update_time": "2026-05-30T06:01:36.004686Z",
+            "uri": "",
+            "urls": [
+              "https://insnav-orchestrator-135515666131.us-central1.run.app"
+            ]
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_artifact_registry_repository.insnav",
+            "google_project_service.enabled",
+            "google_service_account.orchestrator"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_firestore_database",
+      "name": "default",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "app_engine_integration_mode": "DISABLED",
+            "cmek_config": [],
+            "concurrency_mode": "PESSIMISTIC",
+            "create_time": "",
+            "database_edition": "STANDARD",
+            "delete_protection_state": "DELETE_PROTECTION_DISABLED",
+            "deletion_policy": "ABANDON",
+            "earliest_version_time": "2026-05-30T05:48:15.968327Z",
+            "etag": "IM7Yt8S14JQDMMXik+yr4JQD",
+            "id": "projects/insights-navigator-v2/databases/(default)",
+            "key_prefix": "",
+            "location_id": "us-central1",
+            "name": "(default)",
+            "point_in_time_recovery_enablement": "POINT_IN_TIME_RECOVERY_DISABLED",
+            "project": "insights-navigator-v2",
+            "tags": null,
+            "timeouts": null,
+            "type": "FIRESTORE_NATIVE",
+            "uid": "e2cc3eaf-074b-42c9-a2ee-034ce65507d5",
+            "update_time": "",
+            "version_retention_period": "3600s"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_identity_platform_config",
+      "name": "default",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google-beta\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "authorized_domains": [
+              "insights-navigator-v2.firebaseapp.com",
+              "insights-navigator-v2.web.app"
+            ],
+            "autodelete_anonymous_users": false,
+            "blocking_functions": [],
+            "client": [
+              {
+                "api_key": "AIzaSyA7J2-4dKwpRprDqhkiqpK_Gh1RNk-6hLI",
+                "firebase_subdomain": "insights-navigator-v2",
+                "permissions": [
+                  {
+                    "disabled_user_deletion": false,
+                    "disabled_user_signup": false
+                  }
+                ]
+              }
+            ],
+            "id": "projects/insights-navigator-v2/config",
+            "mfa": [
+              {
+                "enabled_providers": [],
+                "provider_configs": [],
+                "state": "DISABLED"
+              }
+            ],
+            "monitoring": [
+              {
+                "request_logging": [
+                  {
+                    "enabled": false
+                  }
+                ]
+              }
+            ],
+            "multi_tenant": [
+              {
+                "allow_tenants": false,
+                "default_tenant_location": ""
+              }
+            ],
+            "name": "projects/135515666131/config",
+            "project": "insights-navigator-v2",
+            "quota": [],
+            "sign_in": [
+              {
+                "allow_duplicate_emails": false,
+                "anonymous": [],
+                "email": [
+                  {
+                    "enabled": true,
+                    "password_required": true
+                  }
+                ],
+                "hash_config": [
+                  {
+                    "algorithm": "SCRYPT",
+                    "memory_cost": 14,
+                    "rounds": 8,
+                    "salt_separator": "Bw==",
+                    "signer_key": "pf4295oP305SPE6Y2E4MhtvBb6u05C4vqng4rvoePbg1oa1oLr0FTKlT3jrqe7FObOdI/04JXitXcvMainnKYg=="
+                  }
+                ],
+                "phone_number": [
+                  {
+                    "enabled": false,
+                    "test_phone_numbers": {}
+                  }
+                ]
+              }
+            ],
+            "sms_region_config": [
+              {
+                "allow_by_default": [],
+                "allowlist_only": []
+              }
+            ],
+            "timeouts": null
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "client"
+              },
+              {
+                "type": "index",
+                "value": {
+                  "value": 0,
+                  "type": "number"
+                }
+              },
+              {
+                "type": "get_attr",
+                "value": "api_key"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_identity_platform_tenant",
+      "name": "default",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google-beta\"]",
+      "instances": []
+    },
+    {
+      "mode": "managed",
+      "type": "google_project_iam_member",
+      "name": "api_gateway",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": "roles/aiplatform.user",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/aiplatform.user/serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/aiplatform.user"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.api_gateway"
+          ]
+        },
+        {
+          "index_key": "roles/bigquery.dataViewer",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/bigquery.dataViewer/serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/bigquery.dataViewer"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.api_gateway"
+          ]
+        },
+        {
+          "index_key": "roles/bigquery.jobUser",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/bigquery.jobUser/serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/bigquery.jobUser"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.api_gateway"
+          ]
+        },
+        {
+          "index_key": "roles/datastore.user",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/datastore.user/serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/datastore.user"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.api_gateway"
+          ]
+        },
+        {
+          "index_key": "roles/secretmanager.secretAccessor",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/secretmanager.secretAccessor/serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/secretmanager.secretAccessor"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.api_gateway"
+          ]
+        },
+        {
+          "index_key": "roles/storage.objectUser",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/storage.objectUser/serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/storage.objectUser"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.api_gateway"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_project_iam_member",
+      "name": "cloudbuild_builder",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/cloudbuild.builds.builder/serviceAccount:135515666131-compute@developer.gserviceaccount.com",
+            "member": "serviceAccount:135515666131-compute@developer.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/cloudbuild.builds.builder"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "data.google_project.this",
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_project_iam_member",
+      "name": "cube",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": "roles/bigquery.dataViewer",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/bigquery.dataViewer/serviceAccount:insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/bigquery.dataViewer"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.cube"
+          ]
+        },
+        {
+          "index_key": "roles/bigquery.jobUser",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/bigquery.jobUser/serviceAccount:insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/bigquery.jobUser"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.cube"
+          ]
+        },
+        {
+          "index_key": "roles/secretmanager.secretAccessor",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/secretmanager.secretAccessor/serviceAccount:insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/secretmanager.secretAccessor"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.cube"
+          ]
+        },
+        {
+          "index_key": "roles/storage.objectUser",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/storage.objectUser/serviceAccount:insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/storage.objectUser"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.cube"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_project_iam_member",
+      "name": "orchestrator",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": "roles/aiplatform.user",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/aiplatform.user/serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/aiplatform.user"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.orchestrator"
+          ]
+        },
+        {
+          "index_key": "roles/bigquery.dataEditor",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/bigquery.dataEditor/serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/bigquery.dataEditor"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.orchestrator"
+          ]
+        },
+        {
+          "index_key": "roles/bigquery.jobUser",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/bigquery.jobUser/serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/bigquery.jobUser"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.orchestrator"
+          ]
+        },
+        {
+          "index_key": "roles/datastore.user",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/datastore.user/serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/datastore.user"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.orchestrator"
+          ]
+        },
+        {
+          "index_key": "roles/secretmanager.secretAccessor",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/secretmanager.secretAccessor/serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/secretmanager.secretAccessor"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.orchestrator"
+          ]
+        },
+        {
+          "index_key": "roles/storage.objectUser",
+          "schema_version": 0,
+          "attributes": {
+            "condition": [],
+            "etag": "BwZTAq7JRNo=",
+            "id": "insights-navigator-v2/roles/storage.objectUser/serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "role": "roles/storage.objectUser"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "google_service_account.orchestrator"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_project_service",
+      "name": "enabled",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": "aiplatform.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/aiplatform.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "aiplatform.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "apikeys.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/apikeys.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "apikeys.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "artifactregistry.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/artifactregistry.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "artifactregistry.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "bigquery.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/bigquery.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "bigquery.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "cloudbuild.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/cloudbuild.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "cloudbuild.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "cloudresourcemanager.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/cloudresourcemanager.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "cloudresourcemanager.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "firebase.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/firebase.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "firebase.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "firebasehosting.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/firebasehosting.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "firebasehosting.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "firestore.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/firestore.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "firestore.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "iamcredentials.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/iamcredentials.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "iamcredentials.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "identitytoolkit.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/identitytoolkit.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "identitytoolkit.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "run.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/run.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "run.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "secretmanager.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/secretmanager.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "secretmanager.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        },
+        {
+          "index_key": "storage.googleapis.com",
+          "schema_version": 0,
+          "attributes": {
+            "disable_dependent_services": false,
+            "disable_on_destroy": false,
+            "id": "insights-navigator-v2/storage.googleapis.com",
+            "project": "insights-navigator-v2",
+            "service": "storage.googleapis.com",
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInJlYWQiOjYwMDAwMDAwMDAwMCwidXBkYXRlIjoxMjAwMDAwMDAwMDAwfX0="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_secret_manager_secret",
+      "name": "anthropic_api_key",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "annotations": {},
+            "create_time": "2026-05-28T20:42:01.000999Z",
+            "deletion_protection": false,
+            "effective_annotations": {},
+            "effective_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "expire_time": "",
+            "id": "projects/insights-navigator-v2/secrets/anthropic-api-key",
+            "labels": {
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "name": "projects/135515666131/secrets/anthropic-api-key",
+            "project": "insights-navigator-v2",
+            "replication": [
+              {
+                "auto": [
+                  {
+                    "customer_managed_encryption": []
+                  }
+                ],
+                "user_managed": []
+              }
+            ],
+            "rotation": [],
+            "secret_id": "anthropic-api-key",
+            "tags": null,
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "timeouts": null,
+            "topics": [],
+            "ttl": null,
+            "version_aliases": {},
+            "version_destroy_ttl": ""
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_secret_manager_secret",
+      "name": "bootstrap_admin_password",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "annotations": {},
+            "create_time": "2026-05-30T06:00:42.727619Z",
+            "deletion_protection": false,
+            "effective_annotations": {},
+            "effective_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "expire_time": "",
+            "id": "projects/insights-navigator-v2/secrets/insnav-bootstrap-admin-password",
+            "labels": {
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "name": "projects/135515666131/secrets/insnav-bootstrap-admin-password",
+            "project": "insights-navigator-v2",
+            "replication": [
+              {
+                "auto": [
+                  {
+                    "customer_managed_encryption": []
+                  }
+                ],
+                "user_managed": []
+              }
+            ],
+            "rotation": [],
+            "secret_id": "insnav-bootstrap-admin-password",
+            "tags": null,
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "timeouts": null,
+            "topics": [],
+            "ttl": null,
+            "version_aliases": {},
+            "version_destroy_ttl": ""
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_secret_manager_secret",
+      "name": "cube_api_secret",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "annotations": {},
+            "create_time": "2026-05-30T04:20:16.218519Z",
+            "deletion_protection": false,
+            "effective_annotations": {},
+            "effective_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "expire_time": "",
+            "id": "projects/insights-navigator-v2/secrets/cube-api-secret",
+            "labels": {
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "name": "projects/135515666131/secrets/cube-api-secret",
+            "project": "insights-navigator-v2",
+            "replication": [
+              {
+                "auto": [
+                  {
+                    "customer_managed_encryption": []
+                  }
+                ],
+                "user_managed": []
+              }
+            ],
+            "rotation": [],
+            "secret_id": "cube-api-secret",
+            "tags": null,
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "timeouts": null,
+            "topics": [],
+            "ttl": null,
+            "version_aliases": {},
+            "version_destroy_ttl": ""
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_secret_manager_secret",
+      "name": "jwt",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 0,
+          "attributes": {
+            "annotations": {},
+            "create_time": "2026-05-28T20:42:00.996691Z",
+            "deletion_protection": false,
+            "effective_annotations": {},
+            "effective_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "expire_time": "",
+            "id": "projects/insights-navigator-v2/secrets/insnav-jwt-secret",
+            "labels": {
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "name": "projects/135515666131/secrets/insnav-jwt-secret",
+            "project": "insights-navigator-v2",
+            "replication": [
+              {
+                "auto": [
+                  {
+                    "customer_managed_encryption": []
+                  }
+                ],
+                "user_managed": []
+              }
+            ],
+            "rotation": [],
+            "secret_id": "insnav-jwt-secret",
+            "tags": null,
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "timeouts": null,
+            "topics": [],
+            "ttl": null,
+            "version_aliases": {},
+            "version_destroy_ttl": ""
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoxMjAwMDAwMDAwMDAwLCJkZWxldGUiOjEyMDAwMDAwMDAwMDAsInVwZGF0ZSI6MTIwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_service_account",
+      "name": "api_gateway",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "account_id": "insnav-api-gateway",
+            "create_ignore_already_exists": null,
+            "description": "",
+            "disabled": false,
+            "display_name": "Insights Navigator — API Gateway runtime SA",
+            "email": "insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "id": "projects/insights-navigator-v2/serviceAccounts/insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "name": "projects/insights-navigator-v2/serviceAccounts/insnav-api-gateway@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "timeouts": null,
+            "unique_id": "102778220414376879253"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjozMDAwMDAwMDAwMDB9fQ=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_service_account",
+      "name": "compute_sandbox",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "account_id": "insnav-compute-sandbox",
+            "create_ignore_already_exists": null,
+            "description": "",
+            "disabled": false,
+            "display_name": "Insights Navigator — Compute sandbox (Stats/Maths) runtime SA",
+            "email": "insnav-compute-sandbox@insights-navigator-v2.iam.gserviceaccount.com",
+            "id": "projects/insights-navigator-v2/serviceAccounts/insnav-compute-sandbox@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-compute-sandbox@insights-navigator-v2.iam.gserviceaccount.com",
+            "name": "projects/insights-navigator-v2/serviceAccounts/insnav-compute-sandbox@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "timeouts": null,
+            "unique_id": "110654367966308207612"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjozMDAwMDAwMDAwMDB9fQ=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_service_account",
+      "name": "cube",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "account_id": "insnav-cube",
+            "create_ignore_already_exists": null,
+            "description": "",
+            "disabled": false,
+            "display_name": "Insights Navigator — Cube semantic-layer runtime SA",
+            "email": "insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "id": "projects/insights-navigator-v2/serviceAccounts/insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "name": "projects/insights-navigator-v2/serviceAccounts/insnav-cube@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "timeouts": null,
+            "unique_id": "110528313323789497466"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjozMDAwMDAwMDAwMDB9fQ=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_service_account",
+      "name": "orchestrator",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "account_id": "insnav-orchestrator",
+            "create_ignore_already_exists": null,
+            "description": "",
+            "disabled": false,
+            "display_name": "Insights Navigator — Orchestrator (agent swarm) runtime SA",
+            "email": "insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "id": "projects/insights-navigator-v2/serviceAccounts/insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "member": "serviceAccount:insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "name": "projects/insights-navigator-v2/serviceAccounts/insnav-orchestrator@insights-navigator-v2.iam.gserviceaccount.com",
+            "project": "insights-navigator-v2",
+            "timeouts": null,
+            "unique_id": "108560595091929066264"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjozMDAwMDAwMDAwMDB9fQ=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "google_storage_bucket",
+      "name": "staging",
+      "provider": "provider[\"registry.terraform.io/hashicorp/google\"]",
+      "instances": [
+        {
+          "index_key": 0,
+          "schema_version": 3,
+          "attributes": {
+            "autoclass": [],
+            "cors": [
+              {
+                "max_age_seconds": 3600,
+                "method": [
+                  "GET",
+                  "POST",
+                  "PUT",
+                  "OPTIONS"
+                ],
+                "origin": [
+                  "*"
+                ],
+                "response_header": [
+                  "Content-Type",
+                  "Location",
+                  "x-goog-resumable"
+                ]
+              }
+            ],
+            "custom_placement_config": [],
+            "default_event_based_hold": false,
+            "effective_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "enable_object_retention": false,
+            "encryption": [],
+            "force_destroy": false,
+            "hierarchical_namespace": [
+              {
+                "enabled": false
+              }
+            ],
+            "id": "insights-navigator-v2-staging",
+            "ip_filter": [],
+            "labels": {
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "lifecycle_rule": [
+              {
+                "action": [
+                  {
+                    "storage_class": "",
+                    "type": "Delete"
+                  }
+                ],
+                "condition": [
+                  {
+                    "age": 30,
+                    "created_before": "",
+                    "custom_time_before": "",
+                    "days_since_custom_time": 0,
+                    "days_since_noncurrent_time": 0,
+                    "matches_prefix": [],
+                    "matches_storage_class": [],
+                    "matches_suffix": [],
+                    "noncurrent_time_before": "",
+                    "num_newer_versions": 0,
+                    "send_age_if_zero": false,
+                    "send_days_since_custom_time_if_zero": false,
+                    "send_days_since_noncurrent_time_if_zero": false,
+                    "send_num_newer_versions_if_zero": false,
+                    "with_state": "ANY"
+                  }
+                ]
+              }
+            ],
+            "location": "US-CENTRAL1",
+            "logging": [],
+            "name": "insights-navigator-v2-staging",
+            "project": "insights-navigator-v2",
+            "project_number": 135515666131,
+            "public_access_prevention": "inherited",
+            "requester_pays": false,
+            "retention_policy": [],
+            "rpo": null,
+            "self_link": "https://www.googleapis.com/storage/v1/b/insights-navigator-v2-staging",
+            "soft_delete_policy": [
+              {
+                "effective_time": "2026-05-28T20:42:01.644Z",
+                "retention_duration_seconds": 604800
+              }
+            ],
+            "storage_class": "STANDARD",
+            "terraform_labels": {
+              "goog-terraform-provisioned": "true",
+              "managed": "terraform",
+              "project": "insights-navigator-v2"
+            },
+            "time_created": "2026-05-28T20:42:01.644Z",
+            "timeouts": null,
+            "uniform_bucket_level_access": true,
+            "updated": "2026-05-28T20:42:01.644Z",
+            "url": "gs://insights-navigator-v2-staging",
+            "versioning": [],
+            "website": []
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo2MDAwMDAwMDAwMDAsInJlYWQiOjI0MDAwMDAwMDAwMCwidXBkYXRlIjoyNDAwMDAwMDAwMDB9LCJzY2hlbWFfdmVyc2lvbiI6IjMifQ==",
+          "dependencies": [
+            "google_project_service.enabled"
+          ]
+        }
+      ]
+    }
+  ],
+  "check_results": null
+}

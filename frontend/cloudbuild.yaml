@@ -1,0 +1,21 @@
+# Cloud Build for the frontend image.
+#   gcloud builds submit frontend --config=frontend/cloudbuild.yaml \
+#     --substitutions=_IMAGE=us-central1-docker.pkg.dev/insights-navigator-v2/insnav/frontend:latest,_API_BASE=https://insnav-api-gateway-q3rm3dw2tq-uc.a.run.app
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg
+      - VITE_API_BASE=${_API_BASE}
+      - --build-arg
+      - VITE_BRAND=${_BRAND}
+      - -t
+      - ${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+substitutions:
+  _BRAND: nebula
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8

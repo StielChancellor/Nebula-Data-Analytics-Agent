@@ -108,7 +108,7 @@ export class ApiClient {
 
   async get<T>(path: string): Promise<T> {
     const headers = await this.authHeaders();
-    const res = await fetch(`${this.baseUrl}${path}`, { headers, credentials: "include" });
+    const res = await fetch(`${this.baseUrl}${path}`, { headers });
     if (!res.ok) throw new Error(`GET ${path} -> ${res.status}`);
     return (await res.json()) as T;
   }
@@ -118,7 +118,6 @@ export class ApiClient {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(body),
     });
     if (!res.ok) {
@@ -181,7 +180,6 @@ export class ApiClient {
     const headers = await this.authHeaders();
     const res = await fetch(`${this.baseUrl}/v1/cube/schemas/${datasetId}.js`, {
       headers,
-      credentials: "include",
     });
     if (!res.ok) throw new Error(`GET cube/.js -> ${res.status}`);
     return res.text();

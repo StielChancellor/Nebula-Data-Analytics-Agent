@@ -1,0 +1,6 @@
+# Keep the Cloud Build upload small.
+**/node_modules/
+**/dist/
+**/dist-*/
+**/.vite/
+.git/

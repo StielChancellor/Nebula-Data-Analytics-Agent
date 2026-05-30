@@ -468,6 +468,34 @@ resource "google_cloud_run_v2_service" "cube" {
   ]
 }
 
+# ---------- 10) Frontend (static SPA on nginx, gated on enable_frontend) ----------
+# Its own Cloud Run service (plug-and-play, separate from the backend). Public;
+# the SPA calls the api_gateway cross-origin (CORS). No SA/secrets needed.
+resource "google_cloud_run_v2_service" "frontend" {
+  count    = var.enable_frontend ? 1 : 0
+  name     = "insnav-frontend"
+  location = var.region
+
+  template {
+    containers {
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/insnav/frontend:latest"
+      ports { container_port = 8080 }
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi" # Cloud Run minimum with always-allocated CPU
+        }
+      }
+    }
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 3
+    }
+  }
+  deletion_protection = false
+  depends_on          = [google_artifact_registry_repository.insnav]
+}
+
 # cube-gen Cloud Run JOB — full rebuild of every tenant's Cube model. Uses the
 # backend image with a different entrypoint command. Run on a schedule or
 # manually; the api_gateway also syncs incrementally on edge approve.

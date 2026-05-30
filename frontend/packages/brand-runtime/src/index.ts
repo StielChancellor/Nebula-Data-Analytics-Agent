@@ -71,7 +71,6 @@ export async function applyBrand(opts?: { apiBase?: string; brandId?: string }):
     try {
       const res = await fetch(`${apiBase}/v1/me/brand`, {
         headers: { "X-Brand-Id": brandId },
-        credentials: "include",
       });
       if (res.ok) {
         const live = (await res.json()) as BrandConfig;
