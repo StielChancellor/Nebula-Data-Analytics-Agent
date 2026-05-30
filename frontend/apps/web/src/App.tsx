@@ -19,6 +19,7 @@ import {
 import { DatasetsView } from "./views/DatasetsView";
 import { GraphView } from "./views/GraphView";
 import { CubeView } from "./views/CubeView";
+import { ChatView } from "./views/ChatView";
 
 interface AppProps {
   brand: BrandConfig;
@@ -26,7 +27,7 @@ interface AppProps {
 
 const DEMO_VALUE = 12_400_000;
 
-type Tab = "datasets" | "graph" | "cube" | "demo";
+type Tab = "chat" | "datasets" | "graph" | "cube" | "demo";
 
 export function App({ brand }: AppProps) {
   const auth = useAuth();
@@ -48,7 +49,7 @@ function BootSplash() {
 
 function AuthedShell({ brand }: { brand: BrandConfig }) {
   const auth = useAuth();
-  const [tab, setTab] = useState<Tab>("datasets");
+  const [tab, setTab] = useState<Tab>("chat");
 
   return (
     <div className="min-h-screen bg-ink-900 text-ink-100">
@@ -69,6 +70,7 @@ function AuthedShell({ brand }: { brand: BrandConfig }) {
       </header>
 
       <main className="max-w-5xl mx-auto p-6 space-y-6">
+        {tab === "chat" && <ChatView />}
         {tab === "datasets" && <DatasetsView />}
         {tab === "graph" && <GraphView />}
         {tab === "cube" && <CubeView />}
@@ -80,6 +82,7 @@ function AuthedShell({ brand }: { brand: BrandConfig }) {
 
 function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const tabs: Array<{ id: Tab; label: string }> = [
+    { id: "chat", label: "Ask" },
     { id: "datasets", label: "Datasets" },
     { id: "graph", label: "Graph" },
     { id: "cube", label: "Cube" },

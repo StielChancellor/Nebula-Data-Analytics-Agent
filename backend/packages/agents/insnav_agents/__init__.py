@@ -1,18 +1,38 @@
 """
-insnav_agents — the 7 agents in the swarm.
+insnav_agents — the agent swarm (Phase 6 MVP: Orchestrator + Semantic +
+Critic + Data-Quality).
 
-V1 deployment (per PRD D5): all 7 live inside services/orchestrator/ as
-in-process Python modules. They communicate via insnav_contracts.AgentMessage
-so extraction-to-RPC later is a port, not a refactor.
+V1 deployment (PRD D5): in-process Python modules behind the orchestrator.
+LLMs select; deterministic code (Cube) computes. `answer_question` is pure +
+injectable (LLM router + Cube client) so the swarm is testable offline.
 
-TODO Phase 6 (Semantic + Critic + DataQuality MVP), Phase 9 (Stats + Maths + Graph).
+Stats / Maths / Graph specialists + the compute sandbox land in Phase 9.
 """
+from .schemas import AnalysisLevel, ChatAnswer, DataHealthBadge, Interpretation
+from .swarm import (
+    answer_question,
+    build_catalog,
+    critic_check,
+    data_health,
+    interpret,
+    to_cube_query,
+)
 
-__version__ = "0.1.0"
+__all__ = [
+    "answer_question",
+    "interpret",
+    "critic_check",
+    "to_cube_query",
+    "data_health",
+    "build_catalog",
+    "ChatAnswer",
+    "Interpretation",
+    "DataHealthBadge",
+    "AnalysisLevel",
+]
 
+__version__ = "0.2.0"
 
-# Each agent will export a `handle(msg: AgentMessage) -> AgentResult` function.
-# Placeholders defined here so imports don't break during scaffold phase.
 
 def list_agents() -> list[str]:
     return ["orchestrator", "semantic", "graph", "stats", "maths", "critic", "data_quality"]

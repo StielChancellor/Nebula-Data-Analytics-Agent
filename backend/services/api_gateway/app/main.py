@@ -27,6 +27,7 @@ from services.api_gateway.app.auth import (
     current_principal,
     issue_token,
 )
+from services.api_gateway.app.chat_router import router as chat_router
 from services.api_gateway.app.cube_router import router as cube_router
 from services.api_gateway.app.datasets_router import router as datasets_router
 from services.api_gateway.app.edges_router import router as edges_router
@@ -35,11 +36,11 @@ from services.api_gateway.app.uploads import router as uploads_router
 
 app = FastAPI(
     title="Insights Navigator V2.0 — API Gateway",
-    version="0.5.0",
+    version="0.6.0",
     description=(
-        "Phase 5 — Cube schema auto-generation: approved graph edges + "
-        "dataset profiles → Cube .js schemas at /v1/cube/schemas. "
-        "See PRD.md and docs/PHASE-5-STATUS.md."
+        "Phase 6 — agent swarm: POST /v1/chat turns a question into a governed "
+        "Cube query (LLM selects, Cube computes) with interpretation echo + "
+        "data-health badge + the query shown. See docs/PHASE-6-STATUS.md."
     ),
 )
 
@@ -132,3 +133,4 @@ app.include_router(datasets_router)
 app.include_router(uploads_router)
 app.include_router(edges_router)
 app.include_router(cube_router)
+app.include_router(chat_router)

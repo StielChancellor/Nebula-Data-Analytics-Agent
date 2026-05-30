@@ -191,6 +191,36 @@ export class ApiClient {
   syncCubeModel(): Promise<CubeSyncResult> {
     return this.post("/v1/cube/sync", {});
   }
+
+  /** Ask the agent swarm a natural-language question. */
+  chat(question: string, datasetIds: string[] = []): Promise<ChatAnswer> {
+    return this.post("/v1/chat", { question, dataset_ids: datasetIds });
+  }
+}
+
+// --- Chat / agent swarm (Phase 6) ---
+
+export interface DataHealthBadge {
+  status: "ok" | "warn" | "block";
+  freshness: Array<{ source: string; last_refreshed: string | null }>;
+  completeness: Array<{ source: string; row_count: number | null }>;
+  coverage_rate: number | null;
+  warnings: string[];
+}
+
+export interface ChatAnswer {
+  kind: "answer" | "clarify" | "refuse";
+  interpretation_echo: string;
+  confidence: number;
+  analysis_level: string;
+  cube_query: Record<string, unknown> | null;
+  columns: string[];
+  rows: unknown[][];
+  data_health: DataHealthBadge | null;
+  method_used: string;
+  caveats: string[];
+  inputs_hash: string;
+  message: string;
 }
 
 export interface CubeSyncResult {
