@@ -36,4 +36,12 @@ export interface AuthContextValue extends AuthState {
   logout: () => void;
   /** Refresh the principal from /v1/auth/me (e.g. after token restore on boot) */
   refresh: () => Promise<void>;
+  /**
+   * Returns the freshest bearer token (Firebase auto-refreshes; bootstrap
+   * returns the stored JWT). Pass this to the ApiClient instead of `token`
+   * so Firebase ID tokens never go stale.
+   */
+  getToken: () => Promise<string | null>;
+  /** True when the app is using Firebase Auth (vs bootstrap admin login). */
+  firebaseMode: boolean;
 }

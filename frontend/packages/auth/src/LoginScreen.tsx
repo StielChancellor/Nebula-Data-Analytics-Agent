@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function LoginScreen({ brandName = "Insights Navigator", brandLogoUrl }: Props) {
-  const { login, status, error } = useAuth();
+  const { login, status, error, firebaseMode } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -82,7 +82,7 @@ export function LoginScreen({ brandName = "Insights Navigator", brandLogoUrl }: 
         </button>
 
         <div className="text-[11px] text-ink-300 text-center pt-1">
-          Bootstrap admin only · Firebase Auth ships in Phase 1.5
+          {firebaseMode ? "Firebase Auth · multi-tenant" : "Bootstrap admin (break-glass)"}
         </div>
       </form>
     </div>

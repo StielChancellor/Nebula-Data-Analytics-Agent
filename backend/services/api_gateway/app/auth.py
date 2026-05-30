@@ -124,6 +124,25 @@ def issue_token(principal: Principal, ttl: dt.timedelta = _JWT_TTL) -> tuple[str
 
 
 def decode_token(token: str) -> Principal:
+    """
+    Dual-mode verify (Phase 1.5). Routes by the JWT `alg` header:
+      - HS256 → our bootstrap admin token (break-glass)
+      - RS256 → a Firebase / Identity Platform ID token (real users)
+    """
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "malformed token") from e
+
+    alg = header.get("alg")
+    if alg == _JWT_ALGO:  # HS256
+        return _decode_bootstrap(token)
+    if alg == "RS256":
+        return _decode_firebase(token)
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"unsupported token alg: {alg}")
+
+
+def _decode_bootstrap(token: str) -> Principal:
     try:
         claims = jwt.decode(
             token,
@@ -143,6 +162,27 @@ def decode_token(token: str) -> Principal:
         tenant_id=claims.get("tenant_id", "default"),
         brand=claims.get("brand", "nebula"),
         roles=claims.get("roles", ["user"]),
+    )
+
+
+def _decode_firebase(token: str) -> Principal:
+    from services.api_gateway.app.firebase import tenant_from_claims, verify_firebase_token
+    from services.api_gateway.app.settings import get_settings
+
+    settings = get_settings()
+    claims = verify_firebase_token(
+        token,
+        project=settings.effective_firebase_project(),
+        jwks_url=settings.firebase_jwks_url,
+    )
+    # Custom claims (set via the Admin SDK) can carry brand + roles; default safely.
+    roles = claims.get("roles") or ["user"]
+    return Principal(
+        sub=claims["sub"],
+        email=claims.get("email", ""),
+        tenant_id=tenant_from_claims(claims),
+        brand=claims.get("brand", "nebula"),
+        roles=roles,
     )
 
 

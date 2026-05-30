@@ -18,8 +18,8 @@ const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 export function CubeView() {
   const auth = useAuth();
   const client = useMemo(
-    () => new ApiClient({ baseUrl: API_BASE, getToken: () => auth.token }),
-    [auth.token],
+    () => new ApiClient({ baseUrl: API_BASE, getToken: auth.getToken }),
+    [auth.getToken],
   );
 
   const [items, setItems] = useState<CubeSchemaSummary[]>([]);

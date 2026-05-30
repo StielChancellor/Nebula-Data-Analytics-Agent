@@ -42,3 +42,9 @@ output "cube_url" {
   value       = var.enable_cube ? google_cloud_run_v2_service.cube[0].uri : null
   description = "Cube REST API base URL (set as INSNAV_CUBE_API_URL on the backend)"
 }
+
+output "firebase_web_api_key" {
+  value       = var.enable_identity_platform ? google_apikeys_key.firebase_web[0].key_string : null
+  description = "Browser API key for the frontend's VITE_FIREBASE_API_KEY"
+  sensitive   = true
+}

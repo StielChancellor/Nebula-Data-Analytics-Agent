@@ -19,6 +19,8 @@ locals {
     "storage.googleapis.com",
     "firebase.googleapis.com",
     "firebasehosting.googleapis.com",
+    "identitytoolkit.googleapis.com", # Identity Platform / Firebase Auth (Phase 1.5)
+    "apikeys.googleapis.com",         # browser API key for the Firebase web SDK
     "iamcredentials.googleapis.com",
     "cloudresourcemanager.googleapis.com",
   ]

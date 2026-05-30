@@ -22,5 +22,6 @@ export type {
 
 export { AuthProvider, useAuth, loadStoredToken } from "./AuthProvider";
 export { LoginScreen } from "./LoginScreen";
+export { isFirebaseConfigured, readFirebaseEnv } from "./firebase";
 
-export const AUTH_VERSION = "0.2.0";
+export const AUTH_VERSION = "0.3.0";

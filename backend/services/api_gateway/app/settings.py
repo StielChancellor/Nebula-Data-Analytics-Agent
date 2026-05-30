@@ -46,6 +46,18 @@ class Settings(BaseSettings):
     # Read from Secret Manager in prod; falls back to a dev value offline.
     cube_api_secret: str = Field(default="dev-cube-secret-change-me", alias="INSNAV_CUBE_API_SECRET")
 
+    # --- Firebase Auth / Identity Platform (Phase 1.5) ---
+    # Project that issues Firebase ID tokens. Empty → falls back to gcp_project.
+    firebase_project: str = Field(default="", alias="INSNAV_FIREBASE_PROJECT")
+    # Google's public JWK endpoint for Firebase Secure Token signing keys.
+    firebase_jwks_url: str = Field(
+        default="https://www.googleapis.com/robot/v1/metadata/jwk/securetoken@system.gserviceaccount.com",
+        alias="INSNAV_FIREBASE_JWKS_URL",
+    )
+
+    def effective_firebase_project(self) -> str:
+        return self.firebase_project or self.gcp_project
+
     # CORS — comma-separated origin list (or "*" in dev)
     cors_origins: str = Field(default="*", alias="INSNAV_CORS_ORIGINS")
 

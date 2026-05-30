@@ -66,6 +66,31 @@ variable "enable_cube" {
   description = "Phase 5b: deploy the Cube semantic-layer Cloud Run service + cube-gen job. Turn on after the cube image is built and pushed. Scales to zero ($0 at idle)."
 }
 
+variable "enable_identity_platform" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Phase 1.5: provision Identity Platform (Firebase Auth) config + a default
+    tenant + a browser API key. Default off. First-time Identity Platform
+    enablement may require a one-time "Get Started" click in the console
+    (the API can't always self-initialize) — see docs/PHASE-1.5-STATUS.md.
+    The backend already verifies Firebase tokens regardless of this toggle.
+  EOT
+}
+
+variable "enable_identity_platform_tenant" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Create a named Identity Platform tenant (multi-brand isolation). Default
+    off — single-tenant works for the MVP (users land in the default tenant and
+    the backend maps them to "default"). Multi-tenancy must be enabled on the
+    project first (Admin API multiTenant.allowTenants=true). The provider's
+    named-tenant create can be finicky; turn this on per-brand once you onboard
+    a second brand.
+  EOT
+}
+
 variable "cube_dev_mode" {
   type        = bool
   default     = false

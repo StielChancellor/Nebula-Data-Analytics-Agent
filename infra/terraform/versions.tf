@@ -15,9 +15,15 @@ terraform {
 provider "google" {
   project = var.project_id
   region  = var.region
+  # Some APIs (apikeys, Identity Platform) bill quota to a project and reject
+  # user ADC without one set. These send var.project_id as the billing project.
+  billing_project       = var.project_id
+  user_project_override = true
 }
 
 provider "google-beta" {
-  project = var.project_id
-  region  = var.region
+  project               = var.project_id
+  region                = var.region
+  billing_project       = var.project_id
+  user_project_override = true
 }
