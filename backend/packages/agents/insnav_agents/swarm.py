@@ -76,7 +76,10 @@ cannot be answered from the catalog, return confidence below 0.4.
 
 async def interpret(question: str, catalog_text: str, router: LLMRouter) -> Interpretation:
     prompt = f"{_SYSTEM_PROMPT}\n\nCATALOG:\n{catalog_text}\n\nQUESTION: {question}\n\nJSON:"
-    resp = await router.generate(prompt=prompt, system=_SYSTEM_PROMPT, max_tokens=2048)
+    try:
+        resp = await router.generate(prompt=prompt, system=_SYSTEM_PROMPT, max_tokens=2048)
+    except Exception:  # noqa: BLE001 — LLM outage/model-unavailable → clarify, never 500
+        return Interpretation(plain_english="(the language model is unavailable)", confidence=0.0)
     data = _extract_json(resp.text)
     if data is None:
         return Interpretation(plain_english="(could not parse interpretation)", confidence=0.0)

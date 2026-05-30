@@ -18,7 +18,7 @@ output "api_gateway_url" {
 }
 
 output "orchestrator_url" {
-  value       = var.enable_cloud_run ? google_cloud_run_v2_service.orchestrator[0].uri : null
+  value       = var.enable_orchestrator ? google_cloud_run_v2_service.orchestrator[0].uri : null
   description = "Cloud Run URL for the orchestrator (agent swarm)"
 }
 

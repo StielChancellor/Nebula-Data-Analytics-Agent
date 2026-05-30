@@ -154,6 +154,20 @@ resource "google_secret_manager_secret" "cube_api_secret" {
   depends_on = [google_project_service.enabled]
 }
 
+# Bootstrap admin password (break-glass login before Firebase users exist).
+# Add a value after apply:
+#   python -c "import secrets;print(secrets.token_urlsafe(18))" | \
+#     gcloud secrets versions add insnav-bootstrap-admin-password --data-file=-
+resource "google_secret_manager_secret" "bootstrap_admin_password" {
+  count     = var.enable_secrets ? 1 : 0
+  secret_id = "insnav-bootstrap-admin-password"
+  replication {
+    auto {}
+  }
+  labels     = var.labels
+  depends_on = [google_project_service.enabled]
+}
+
 # ---------- 7) Service accounts ----------
 resource "google_service_account" "api_gateway" {
   account_id   = "insnav-api-gateway"
@@ -196,6 +210,7 @@ resource "google_project_iam_member" "api_gateway" {
     "roles/storage.objectUser",           # write/prune the Cube model in GCS (Phase 5b sync)
     "roles/bigquery.dataViewer",          # profiler + edge-overlap queries
     "roles/bigquery.jobUser",             # run those queries
+    "roles/aiplatform.user",              # Gemini via Vertex AI (the chat brain)
   ])
   project = var.project_id
   role    = each.key
@@ -235,8 +250,63 @@ resource "google_cloud_run_v2_service" "api_gateway" {
       resources {
         limits = {
           cpu    = "1"
-          memory = "512Mi"
+          memory = "1Gi" # google SDKs + LLM clients need headroom
         }
+        startup_cpu_boost = true
+      }
+
+      env {
+        name  = "INSNAV_GCP_PROJECT"
+        value = var.project_id
+      }
+      env {
+        name  = "INSNAV_CORS_ORIGINS"
+        value = "*" # tighten to the deployed frontend origin(s) before prod
+      }
+      env {
+        name  = "BOOTSTRAP_ADMIN_EMAIL"
+        value = var.bootstrap_admin_email
+      }
+      env {
+        name = "BOOTSTRAP_ADMIN_PASSWORD"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.bootstrap_admin_password[0].secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "INSNAV_JWT_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.jwt[0].secret_id
+            version = "latest"
+          }
+        }
+      }
+      # Point the chat agent at the live Cube (Phase 5b/5c) when it's deployed.
+      env {
+        name  = "INSNAV_CUBE_API_URL"
+        value = var.enable_cube ? google_cloud_run_v2_service.cube[0].uri : ""
+      }
+      env {
+        name = "INSNAV_CUBE_API_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.cube_api_secret[0].secret_id
+            version = "latest"
+          }
+        }
+      }
+      # Default chat brain (the dropdown can switch per request).
+      env {
+        name  = "INSNAV_LLM_PRIMARY"
+        value = var.llm_primary
+      }
+      env {
+        name  = "INSNAV_LLM_MODEL"
+        value = var.llm_model
       }
     }
     scaling {
@@ -248,7 +318,10 @@ resource "google_cloud_run_v2_service" "api_gateway" {
 }
 
 resource "google_cloud_run_v2_service" "orchestrator" {
-  count    = var.enable_cloud_run ? 1 : 0
+  # The agent swarm runs IN-PROCESS in api_gateway (PRD D5); this separate
+  # service is a future extraction point. Gated off until its image exists and
+  # it's actually used.
+  count    = var.enable_orchestrator ? 1 : 0
   name     = "insnav-orchestrator"
   location = var.region
 

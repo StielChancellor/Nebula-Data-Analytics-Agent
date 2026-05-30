@@ -47,26 +47,35 @@ class GeminiProvider:
     """
     name: ProviderName = "gemini"
 
-    def __init__(self, model: str = "gemini-3.0-preview", project: str | None = None, location: str = "us-central1"):
-        self.model = model
-        self.project = project or os.getenv("GOOGLE_CLOUD_PROJECT", "insights-navigator-v2")
-        self.location = location
+    def __init__(self, model: str | None = None, project: str | None = None, location: str | None = None):
+        # Env overrides let the deploy pick a known-available model/region
+        # without code changes (e.g. set INSNAV_LLM_MODEL=gemini-2.5-pro).
+        self.model = model or os.getenv("INSNAV_LLM_MODEL") or "gemini-3.0-preview"
+        self.project = project or os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("INSNAV_GCP_PROJECT", "insights-navigator-v2")
+        self.location = location or os.getenv("INSNAV_VERTEX_LOCATION", "us-central1")
 
     async def generate(self, *, prompt: str, system: str | None = None, max_tokens: int = 16_384) -> LLMResponse:
-        try:
-            from google import genai  # type: ignore[import-not-found]
-        except ImportError as e:
-            raise RuntimeError("google-genai not installed; install backend with `pip install -e .[dev]`") from e
+        import asyncio
+
+        return await asyncio.to_thread(self._generate_sync, prompt, system, max_tokens)
+
+    def _generate_sync(self, prompt: str, system: str | None, max_tokens: int) -> LLMResponse:
+        from google import genai  # type: ignore[import-not-found]
 
         client = genai.Client(vertexai=True, project=self.project, location=self.location)
-        # Note: avoid asyncio.to_thread here — google-genai's async API surface
-        # is still in flux. Keep this sync-call shape and run in a worker if
-        # the caller is in an event loop. TODO Phase 6 — wire properly.
-        contents = [{"role": "user", "parts": [{"text": prompt}]}]
-        cfg: dict[str, Any] = {"max_output_tokens": max_tokens}
-        if system:
-            cfg["system_instruction"] = system
-        resp = client.models.generate_content(model=self.model, contents=contents, config=cfg)
+        # Build config defensively: prefer the typed GenerateContentConfig, fall
+        # back to a plain dict if the SDK shape differs across versions.
+        cfg: Any
+        try:
+            from google.genai import types  # type: ignore[import-not-found]
+            cfg = types.GenerateContentConfig(
+                max_output_tokens=max_tokens,
+                **({"system_instruction": system} if system else {}),
+            )
+        except Exception:  # noqa: BLE001
+            cfg = {"max_output_tokens": max_tokens, **({"system_instruction": system} if system else {})}
+
+        resp = client.models.generate_content(model=self.model, contents=prompt, config=cfg)
         text = getattr(resp, "text", "") or ""
         finish = getattr(resp, "finish_reason", "stop")
         return LLMResponse(text=text, model=self.model, provider=self.name, finish_reason=str(finish))

@@ -10,11 +10,11 @@ COPY pyproject.toml ./
 COPY packages ./packages
 COPY services ./services
 
-# Install with the [gcp] extra so the runtime has google-cloud-storage /
-# bigquery / firestore — needed by uploads, the profiler, the edge proposer,
-# and the cube-gen job (which runs from this same image).
+# [gcp] (storage/bigquery/firestore for uploads, profiler, edge proposer,
+# cube-gen) + [llm] (google-genai + anthropic so the chat agent has a real
+# brain — Gemini via Vertex ADC, Claude via key).
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir '.[gcp]'
+ && pip install --no-cache-dir '.[gcp,llm]'
 
 FROM python:3.11-slim
 WORKDIR /app

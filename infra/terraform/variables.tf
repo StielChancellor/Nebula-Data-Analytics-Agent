@@ -66,6 +66,30 @@ variable "enable_cube" {
   description = "Phase 5b: deploy the Cube semantic-layer Cloud Run service + cube-gen job. Turn on after the cube image is built and pushed. Scales to zero ($0 at idle)."
 }
 
+variable "enable_orchestrator" {
+  type        = bool
+  default     = false
+  description = "Deploy the separate orchestrator service. The agent swarm runs in-process in api_gateway (PRD D5), so this stays off until the swarm is extracted + its image built."
+}
+
+variable "bootstrap_admin_email" {
+  type        = string
+  default     = "admin@insnav.local"
+  description = "Break-glass admin email (password lives in Secret Manager)."
+}
+
+variable "llm_primary" {
+  type        = string
+  default     = "gemini"
+  description = "Default chat brain provider (gemini|claude|stub)."
+}
+
+variable "llm_model" {
+  type        = string
+  default     = "gemini-2.5-pro"
+  description = "Default Gemini model (a known-available Vertex model)."
+}
+
 variable "enable_identity_platform" {
   type        = bool
   default     = false

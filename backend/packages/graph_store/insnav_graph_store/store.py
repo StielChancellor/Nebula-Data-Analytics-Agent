@@ -183,13 +183,15 @@ def _list_by_state(tenant_id: str, state: EdgeState) -> list[GraphEdge]:
             if d.get("tenant_id") == tenant_id and d.get("state") == state
         ]
 
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
     from services.api_gateway.app.gcp_clients import firestore_client
 
     docs = (
         firestore_client()
         .collection(_FS_COLLECTION)
-        .where(filter=("tenant_id", "==", tenant_id))
-        .where(filter=("state", "==", state))
+        .where(filter=FieldFilter("tenant_id", "==", tenant_id))
+        .where(filter=FieldFilter("state", "==", state))
         .stream()
     )
     out: list[GraphEdge] = []
@@ -212,12 +214,14 @@ def _find_directionless(tenant_id: str, key: tuple[str, str, str, str]) -> Graph
         return None
 
     # Firestore: pull all edges for the tenant and scan in-process
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
     from services.api_gateway.app.gcp_clients import firestore_client
 
     docs = (
         firestore_client()
         .collection(_FS_COLLECTION)
-        .where(filter=("tenant_id", "==", tenant_id))
+        .where(filter=FieldFilter("tenant_id", "==", tenant_id))
         .stream()
     )
     for d in docs:

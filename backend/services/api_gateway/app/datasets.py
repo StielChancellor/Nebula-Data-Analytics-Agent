@@ -161,13 +161,15 @@ def list_datasets_for_tenant(tenant_id: str) -> list[Dataset]:
             if d.get("tenant_id") == tenant_id
         ]
 
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
     from services.api_gateway.app.gcp_clients import firestore_client
     from services.api_gateway.app.settings import get_settings
 
     docs = (
         firestore_client()
         .collection(get_settings().fs_datasets_collection)
-        .where(filter=("tenant_id", "==", tenant_id))
+        .where(filter=FieldFilter("tenant_id", "==", tenant_id))
         .stream()
     )
     out: list[Dataset] = []
@@ -185,13 +187,15 @@ def list_all_ready_datasets() -> list[Dataset]:
     if _offline():
         return [Dataset(**d) for d in _OFFLINE_DATASETS.values() if d.get("status") == "ready"]
 
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
     from services.api_gateway.app.gcp_clients import firestore_client
     from services.api_gateway.app.settings import get_settings
 
     docs = (
         firestore_client()
         .collection(get_settings().fs_datasets_collection)
-        .where(filter=("status", "==", "ready"))
+        .where(filter=FieldFilter("status", "==", "ready"))
         .stream()
     )
     out: list[Dataset] = []
