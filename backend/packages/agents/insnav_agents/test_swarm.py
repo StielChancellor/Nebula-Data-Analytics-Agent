@@ -12,6 +12,7 @@ from insnav_agents import (
     build_catalog,
     critic_check,
     data_health,
+    run_specialist_analysis,
     to_cube_query,
 )
 from insnav_agents.schemas import Interpretation
@@ -98,6 +99,33 @@ class TestCatalogAndCritic:
         assert critic_check(Interpretation(confidence=0.9), valid)
 
 
+class TestSpecialistAnalysis:
+    def test_forecast_routes_to_series(self):
+        cols = ["c.m"]
+        rows = [[v] for v in (1, 2, 3, 4, 5, 6, 7, 8)]
+        out = run_specialist_analysis({"method": "forecast", "value_field": "c.m", "periods": 2}, cols, rows)
+        assert out["method_used"] == "holt_linear"
+        assert len(out["result"]["predictions"]) == 2
+
+    def test_significance_splits_by_group(self):
+        cols = ["c.region", "c.rev"]
+        rows = [["A", 10], ["A", 11], ["A", 9], ["A", 10], ["B", 20], ["B", 21], ["B", 19], ["B", 20]]
+        out = run_specialist_analysis(
+            {"method": "significance", "value_field": "c.rev", "group_field": "c.region",
+             "group_a": "A", "group_b": "B"}, cols, rows)
+        assert out["result"]["significant"] is True
+
+    def test_correlation_two_fields(self):
+        cols = ["c.x", "c.y"]
+        rows = [[1, 2], [2, 4], [3, 6], [4, 8], [5, 10]]
+        out = run_specialist_analysis({"method": "correlation", "x_field": "c.x", "y_field": "c.y"}, cols, rows)
+        assert out["result"]["r"] == pytest.approx(1.0, abs=1e-9)
+
+    def test_missing_field_is_graceful(self):
+        out = run_specialist_analysis({"method": "forecast", "value_field": "nope"}, ["c.m"], [[1], [2]])
+        assert out["confidence"] == 0.0
+
+
 class TestToCubeQuery:
     def test_maps_all_parts(self):
         interp = Interpretation(
@@ -179,6 +207,26 @@ class TestAnswerQuestion:
         a = await answer_question("revenue by city", router=_router(_good_interp()), **kw)
         b = await answer_question("revenue by city", router=_router(_good_interp()), **kw)
         assert a.inputs_hash == b.inputs_hash
+
+    @pytest.mark.asyncio
+    async def test_forecast_analysis_attached(self):
+        # A cube client returning a clean upward series; analysis=forecast.
+        class _SeriesCube:
+            def load(self, query, *, tenant_id):
+                rows = [{f"{CUBE}.sum_revenue": v} for v in (1, 2, 3, 4, 5, 6, 7, 8)]
+                return {"data": rows, "_stub": False}
+
+        interp = _good_interp()
+        interp["analysis"] = {"method": "forecast", "value_field": f"{CUBE}.sum_revenue", "periods": 3}
+        interp["dimensions"] = []  # series of the measure only
+        ans = await answer_question(
+            "forecast revenue", tenant_id="t1", schemas=[_schema()], dataset_health=_health(),
+            router=_router(interp), cube_client=_SeriesCube(),
+        )
+        assert ans.kind == "answer"
+        assert ans.analysis is not None
+        assert ans.analysis["method_used"] == "holt_linear"
+        assert len(ans.analysis["result"]["predictions"]) == 3
 
     @pytest.mark.asyncio
     async def test_unparseable_llm_output_clarifies(self):

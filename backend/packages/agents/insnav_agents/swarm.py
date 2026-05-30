@@ -69,6 +69,16 @@ Return ONLY a JSON object with these keys:
 
 Only use measures/dimensions that appear EXACTLY in the catalog. If the question
 cannot be answered from the catalog, return confidence below 0.4.
+
+If (and only if) the question is INFERENTIAL — forecast, trend, "is X
+significantly different", correlation, or anomaly/outlier detection — also add an
+"analysis" object, choosing fields from the query you built:
+  forecast:     {"method":"forecast","value_field":"<measure>","periods":3}
+  significance: {"method":"significance","value_field":"<measure>","group_field":"<dimension>","group_a":"<value>","group_b":"<value>"}
+  correlation:  {"method":"correlation","x_field":"<measure>","y_field":"<measure>"}
+  anomaly:      {"method":"anomaly","value_field":"<measure>"}
+  summary:      {"method":"summary","value_field":"<measure>"}
+Otherwise omit "analysis". The numbers are computed by deterministic code, not you.
 """
 
 
@@ -158,6 +168,62 @@ def _rows_from_cube(result: dict[str, Any], query: dict[str, Any]) -> tuple[list
     return cols, rows
 
 
+# ---------- Stats/Maths specialist (Phase 9) ----------
+
+def _to_float(v: Any) -> float | None:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def run_specialist_analysis(
+    directive: dict[str, Any], columns: list[str], rows: list[list[Any]]
+) -> dict[str, Any]:
+    """
+    Map an LLM-chosen analysis directive onto the Cube result columns and run the
+    deterministic stats method. Graceful on any mapping gap.
+    """
+    from . import stats
+
+    method = (directive or {}).get("method")
+    col_index = {c: i for i, c in enumerate(columns)}
+
+    def column(field: str | None) -> list[float] | None:
+        i = col_index.get(field) if field else None
+        if i is None:
+            return None
+        return [v for v in (_to_float(r[i]) for r in rows) if v is not None]
+
+    if method in ("forecast", "summary", "anomaly"):
+        series = column(directive.get("value_field"))
+        if not series:
+            return stats._envelope(method, {}, confidence=0.0,
+                                   caveats=[f"value_field '{directive.get('value_field')}' not in result"])
+        if method == "forecast":
+            return stats.run_analysis("forecast", series=series, periods=int(directive.get("periods", 3)))
+        return stats.run_analysis(method, values=series)
+
+    if method == "correlation":
+        x, y = column(directive.get("x_field")), column(directive.get("y_field"))
+        if not x or not y:
+            return stats._envelope("correlation", {}, confidence=0.0, caveats=["x_field/y_field not in result"])
+        return stats.run_analysis("correlation", x=x, y=y)
+
+    if method == "significance":
+        vi = col_index.get(directive.get("value_field"))
+        gi = col_index.get(directive.get("group_field"))
+        if vi is None or gi is None:
+            return stats._envelope("significance", {}, confidence=0.0,
+                                   caveats=["value_field/group_field not in result"])
+        ga, gb = str(directive.get("group_a")), str(directive.get("group_b"))
+        a = [v for v in (_to_float(r[vi]) for r in rows if str(r[gi]) == ga) if v is not None]
+        b = [v for v in (_to_float(r[vi]) for r in rows if str(r[gi]) == gb) if v is not None]
+        return stats.run_analysis("significance", group_a=a, group_b=b)
+
+    return stats.run_analysis(method or "unknown")
+
+
 # ---------- Data-Quality agent: health badge ----------
 
 def data_health(dataset_health: list[dict[str, Any]]) -> DataHealthBadge:
@@ -243,6 +309,12 @@ async def answer_question(
     if result.get("_stub"):
         caveats.append("Cube is not deployed in this environment — results are illustrative (stub).")
 
+    # Phase 9: if the LLM requested an inferential analysis, run the
+    # deterministic specialist method on the result (Stats/Maths agent).
+    analysis: dict[str, Any] | None = None
+    if interp.analysis and interp.analysis.get("method") and rows:
+        analysis = run_specialist_analysis(interp.analysis, columns, rows)
+
     return ChatAnswer(
         kind="answer",
         interpretation_echo=interp.plain_english,
@@ -255,4 +327,5 @@ async def answer_question(
         method_used="cube_query",
         caveats=caveats,
         inputs_hash=compute_inputs_hash({"q": question, "query": query, "tenant": tenant_id}),
+        analysis=analysis,
     )

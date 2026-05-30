@@ -8,6 +8,7 @@ injectable (LLM router + Cube client) so the swarm is testable offline.
 
 Stats / Maths / Graph specialists + the compute sandbox land in Phase 9.
 """
+from . import stats
 from .schemas import AnalysisLevel, ChatAnswer, DataHealthBadge, Interpretation
 from .swarm import (
     answer_question,
@@ -15,6 +16,7 @@ from .swarm import (
     critic_check,
     data_health,
     interpret,
+    run_specialist_analysis,
     to_cube_query,
 )
 
@@ -25,6 +27,8 @@ __all__ = [
     "to_cube_query",
     "data_health",
     "build_catalog",
+    "run_specialist_analysis",
+    "stats",
     "ChatAnswer",
     "Interpretation",
     "DataHealthBadge",

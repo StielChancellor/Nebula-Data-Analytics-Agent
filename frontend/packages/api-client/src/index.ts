@@ -233,6 +233,16 @@ export interface ChatAnswer {
   caveats: string[];
   inputs_hash: string;
   message: string;
+  /** Phase 9: specialist (stats/maths) result envelope, when an analysis ran. */
+  analysis: AnalysisResult | null;
+}
+
+export interface AnalysisResult {
+  method_used: string;
+  result: Record<string, unknown>;
+  assumptions_checked: string[];
+  confidence: number;
+  caveats: string[];
 }
 
 export interface CubeSyncResult {

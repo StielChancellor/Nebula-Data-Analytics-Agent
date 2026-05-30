@@ -172,6 +172,29 @@ function AnswerCard({ answer }: { answer: ChatAnswer }) {
         </div>
       )}
 
+      {/* Phase 9: specialist analysis (forecast / significance / correlation / anomaly) */}
+      {answer.analysis && (
+        <div className="p-4">
+          <div className="text-[11px] uppercase tracking-wider text-ink-300 mb-1">
+            Analysis · {answer.analysis.method_used}
+            <span className="ml-2 text-ink-400">
+              {Math.round(answer.analysis.confidence * 100)}% conf
+            </span>
+          </div>
+          <pre className="text-[11px] font-mono text-accent-glow whitespace-pre-wrap">
+            {JSON.stringify(answer.analysis.result, null, 2)}
+          </pre>
+          {answer.analysis.assumptions_checked.length > 0 && (
+            <div className="text-[10px] text-ink-300 mt-1">
+              assumptions: {answer.analysis.assumptions_checked.join("; ")}
+            </div>
+          )}
+          {answer.analysis.caveats.map((c, i) => (
+            <div key={i} className="text-[11px] text-amber-300 mt-0.5">⚠ {c}</div>
+          ))}
+        </div>
+      )}
+
       {/* Show-your-work: the Cube query */}
       {answer.cube_query && (
         <details className="p-4">

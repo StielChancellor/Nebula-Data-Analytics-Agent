@@ -53,6 +53,14 @@ secrets = [
 exports = [
   "openpyxl>=3.1",
 ]
+# Stats/Maths specialist agents (Phase 9) — deterministic compute.
+# numpy + scipy cover significance tests, correlation, anomaly detection;
+# forecasting is done with numpy (no statsmodels, to avoid bleeding-edge
+# Python wheel gaps).
+stats = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+]
 # Dev tooling (Phase 0+)
 dev = [
   "pytest>=8.2",

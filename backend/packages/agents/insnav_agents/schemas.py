@@ -30,6 +30,12 @@ class Interpretation(BaseModel):
     plain_english: str = ""
     analysis_level: AnalysisLevel = "descriptive"
     confidence: float = 0.0
+    # Optional specialist directive (Phase 9). When the question is inferential,
+    # the LLM picks a method + the fields to run it on; deterministic stats code
+    # computes the numbers. e.g. {"method":"forecast","value_field":"c.m","periods":3}
+    # or {"method":"significance","value_field":"c.m","group_field":"c.d",
+    #     "group_a":"X","group_b":"Y"} or {"method":"correlation","x_field","y_field"}.
+    analysis: dict[str, Any] | None = None
 
 
 class DataHealthBadge(BaseModel):
@@ -62,5 +68,8 @@ class ChatAnswer(BaseModel):
     method_used: str = "cube_query"
     caveats: list[str] = Field(default_factory=list)
     inputs_hash: str = ""
+    # Specialist result (Phase 9): the stats/maths envelope
+    # {method_used, result, assumptions_checked, confidence, caveats}.
+    analysis: dict[str, Any] | None = None
     # For kind="clarify"/"refuse": the message to show the user.
     message: str = ""

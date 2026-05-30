@@ -10,11 +10,10 @@ COPY pyproject.toml ./
 COPY packages ./packages
 COPY services ./services
 
-# [gcp] (storage/bigquery/firestore for uploads, profiler, edge proposer,
-# cube-gen) + [llm] (google-genai + anthropic so the chat agent has a real
-# brain — Gemini via Vertex ADC, Claude via key).
+# [gcp] (storage/bigquery/firestore) + [llm] (google-genai + anthropic) +
+# [stats] (numpy/scipy for the Stats/Maths specialist agents).
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir '.[gcp,llm]'
+ && pip install --no-cache-dir '.[gcp,llm,stats]'
 
 FROM python:3.11-slim
 WORKDIR /app
