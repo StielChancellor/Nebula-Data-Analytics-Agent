@@ -123,6 +123,21 @@ resource "google_secret_manager_secret" "anthropic_api_key" {
   depends_on = [google_project_service.enabled]
 }
 
+# Phase 5b: shared secret signing Cube API tokens. Backend
+# (INSNAV_CUBE_API_SECRET) and the Cube service (CUBEJS_API_SECRET) must read
+# the SAME value. Add a version after apply:
+#   python -c "import secrets;print(secrets.token_hex(24))" | \
+#     gcloud secrets versions add cube-api-secret --data-file=-
+resource "google_secret_manager_secret" "cube_api_secret" {
+  count     = var.enable_secrets ? 1 : 0
+  secret_id = "cube-api-secret"
+  replication {
+    auto {}
+  }
+  labels     = var.labels
+  depends_on = [google_project_service.enabled]
+}
+
 # ---------- 7) Service accounts ----------
 resource "google_service_account" "api_gateway" {
   account_id   = "insnav-api-gateway"
@@ -161,11 +176,32 @@ resource "google_project_iam_member" "orchestrator" {
 resource "google_project_iam_member" "api_gateway" {
   for_each = toset([
     "roles/datastore.user",               # Firestore reads for /v1/me/*
-    "roles/secretmanager.secretAccessor", # JWT secret
+    "roles/secretmanager.secretAccessor", # JWT secret + cube API secret
+    "roles/storage.objectUser",           # write/prune the Cube model in GCS (Phase 5b sync)
+    "roles/bigquery.dataViewer",          # profiler + edge-overlap queries
+    "roles/bigquery.jobUser",             # run those queries
   ])
   project = var.project_id
   role    = each.key
   member  = "serviceAccount:${google_service_account.api_gateway.email}"
+}
+
+# ---------- Cube runtime SA (Phase 5b) ----------
+resource "google_service_account" "cube" {
+  account_id   = "insnav-cube"
+  display_name = "Insights Navigator — Cube semantic-layer runtime SA"
+}
+
+resource "google_project_iam_member" "cube" {
+  for_each = toset([
+    "roles/bigquery.dataViewer",          # read the raw tables to answer queries
+    "roles/bigquery.jobUser",             # run the compiled SQL
+    "roles/storage.objectViewer",         # read the data model from GCS
+    "roles/secretmanager.secretAccessor", # read the cube API secret
+  ])
+  project = var.project_id
+  role    = each.key
+  member  = "serviceAccount:${google_service_account.cube.email}"
 }
 
 # ---------- 8) Cloud Run (gated until the first image exists) ----------
@@ -217,6 +253,101 @@ resource "google_cloud_run_v2_service" "orchestrator" {
       # graph stays consistent (no cross-instance write races).
       min_instance_count = 1
       max_instance_count = 1
+    }
+  }
+  depends_on = [google_artifact_registry_repository.insnav]
+}
+
+# ---------- 9) Cube semantic layer (Phase 5b, gated on enable_cube) ----------
+# Scales to zero — $0 at idle. Reads its data model from GCS (written by the
+# backend sync) and queries BigQuery via the cube runtime SA's ADC.
+resource "google_cloud_run_v2_service" "cube" {
+  count    = var.enable_cube ? 1 : 0
+  name     = "insnav-cube"
+  location = var.region
+
+  template {
+    service_account = google_service_account.cube.email
+    containers {
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/insnav/cube:latest"
+      ports { container_port = 8080 }
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "1Gi"
+        }
+      }
+      env {
+        name  = "CUBEJS_DB_TYPE"
+        value = "bigquery"
+      }
+      env {
+        name  = "CUBEJS_DB_BQ_PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        name  = "CUBEJS_DEV_MODE"
+        value = "false"
+      }
+      env {
+        name  = "INSNAV_CUBE_MODEL_BUCKET"
+        value = "${var.project_id}-staging"
+      }
+      env {
+        name  = "INSNAV_CUBE_MODEL_PREFIX"
+        value = "cube-model"
+      }
+      env {
+        name = "CUBEJS_API_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.cube_api_secret[0].secret_id
+            version = "latest"
+          }
+        }
+      }
+    }
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 3
+    }
+  }
+  depends_on = [
+    google_artifact_registry_repository.insnav,
+    google_secret_manager_secret.cube_api_secret,
+  ]
+}
+
+# cube-gen Cloud Run JOB — full rebuild of every tenant's Cube model. Uses the
+# backend image with a different entrypoint command. Run on a schedule or
+# manually; the api_gateway also syncs incrementally on edge approve.
+resource "google_cloud_run_v2_job" "cube_gen" {
+  count    = var.enable_cube ? 1 : 0
+  name     = "insnav-cube-gen"
+  location = var.region
+
+  template {
+    template {
+      service_account = google_service_account.api_gateway.email
+      containers {
+        image   = "${var.region}-docker.pkg.dev/${var.project_id}/insnav/api:latest"
+        command = ["python", "-m", "services.cube_gen.app.main"]
+        env {
+          name  = "INSNAV_CUBE_MODEL_BUCKET"
+          value = "${var.project_id}-staging"
+        }
+        env {
+          name  = "INSNAV_CUBE_MODEL_PREFIX"
+          value = "cube-model"
+        }
+        resources {
+          limits = {
+            cpu    = "1"
+            memory = "512Mi"
+          }
+        }
+      }
+      timeout = "600s"
     }
   }
   depends_on = [google_artifact_registry_repository.insnav]

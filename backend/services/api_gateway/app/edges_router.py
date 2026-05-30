@@ -16,6 +16,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -31,6 +32,8 @@ from insnav_graph_store.store import get_edge
 from services.api_gateway.app.auth import Principal, current_principal
 from services.api_gateway.app.datasets import get_dataset as get_ds
 from services.api_gateway.app.edge_proposer import propose_for_dataset
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["edges"])
 
@@ -57,7 +60,19 @@ def approve(
     edge = get_edge(edge_id)
     if edge is None or edge.tenant_id != principal.tenant_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "edge not found")
-    return store_approve(edge_id, reviewer_email=principal.email)
+    approved = store_approve(edge_id, reviewer_email=principal.email)
+
+    # Phase 5b: a newly-approved edge changes the Cube model (it becomes a
+    # join). Re-publish so the deployed Cube container picks it up. Wrapped
+    # in try/except — a sync hiccup must not roll back the approval.
+    try:
+        from services.api_gateway.app.cube_sync_service import sync_tenant
+
+        sync_tenant(principal.tenant_id)
+    except Exception:  # noqa: BLE001
+        logger.exception("cube model sync after approve failed (edge %s)", edge_id)
+
+    return approved
 
 
 @router.post("/v1/edges/{edge_id}/reject", response_model=GraphEdge)

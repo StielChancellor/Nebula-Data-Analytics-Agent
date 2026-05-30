@@ -32,6 +32,20 @@ class Settings(BaseSettings):
         default="datasets", alias="INSNAV_FS_DATASETS_COLLECTION"
     )
 
+    # --- Cube (Phase 5b) ---
+    # Where generated Cube .js schemas are written for the Cube container to read.
+    # Reuses the staging bucket with a dedicated prefix.
+    cube_model_bucket: str = Field(
+        default="insights-navigator-v2-staging", alias="INSNAV_CUBE_MODEL_BUCKET"
+    )
+    cube_model_prefix: str = Field(default="cube-model", alias="INSNAV_CUBE_MODEL_PREFIX")
+    # Cube REST API base URL (the deployed Cube Cloud Run service). Empty until
+    # Cube is deployed (Phase 5b apply); the query client falls back to offline.
+    cube_api_url: str = Field(default="", alias="INSNAV_CUBE_API_URL")
+    # Shared secret used to sign Cube API tokens (matches Cube's CUBEJS_API_SECRET).
+    # Read from Secret Manager in prod; falls back to a dev value offline.
+    cube_api_secret: str = Field(default="dev-cube-secret-change-me", alias="INSNAV_CUBE_API_SECRET")
+
     # CORS — comma-separated origin list (or "*" in dev)
     cors_origins: str = Field(default="*", alias="INSNAV_CORS_ORIGINS")
 

@@ -60,6 +60,12 @@ variable "enable_cloud_run" {
   description = "Turn on after the first backend image is built and pushed to Artifact Registry."
 }
 
+variable "enable_cube" {
+  type        = bool
+  default     = false
+  description = "Phase 5b: deploy the Cube semantic-layer Cloud Run service + cube-gen job. Turn on after the cube image is built and pushed. Scales to zero ($0 at idle)."
+}
+
 variable "enable_firebase_hosting" {
   type        = bool
   default     = false

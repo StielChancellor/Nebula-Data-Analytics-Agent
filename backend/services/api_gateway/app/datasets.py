@@ -178,6 +178,48 @@ def list_datasets_for_tenant(tenant_id: str) -> list[Dataset]:
     return out
 
 
+def list_all_ready_datasets() -> list[Dataset]:
+    """All ready datasets across every tenant. Used by the cube_gen job to
+    rebuild the full Cube model. Tenant-scoped reads use
+    list_datasets_for_tenant() instead."""
+    if _offline():
+        return [Dataset(**d) for d in _OFFLINE_DATASETS.values() if d.get("status") == "ready"]
+
+    from services.api_gateway.app.gcp_clients import firestore_client
+    from services.api_gateway.app.settings import get_settings
+
+    docs = (
+        firestore_client()
+        .collection(get_settings().fs_datasets_collection)
+        .where(filter=("status", "==", "ready"))
+        .stream()
+    )
+    out: list[Dataset] = []
+    for doc in docs:
+        data = doc.to_dict()
+        if data:
+            out.append(Dataset(**data))
+    return out
+
+
+def get_column_profiles(dataset_id: str) -> list[dict[str, Any]]:
+    """Read a dataset's column profiles as plain dicts (for the Cube generator)."""
+    if _offline():
+        return list(_OFFLINE_COLUMNS.get(dataset_id, {}).values())
+
+    from services.api_gateway.app.gcp_clients import firestore_client
+    from services.api_gateway.app.settings import get_settings
+
+    docs = (
+        firestore_client()
+        .collection(get_settings().fs_datasets_collection)
+        .document(dataset_id)
+        .collection("columns")
+        .stream()
+    )
+    return [d.to_dict() or {} for d in docs]
+
+
 def save_column_profiles(dataset_id: str, profiles: list[ColumnProfile]) -> None:
     if _offline():
         _OFFLINE_COLUMNS[dataset_id] = {p.name: p.model_dump() for p in profiles}

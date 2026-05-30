@@ -186,6 +186,18 @@ export class ApiClient {
     if (!res.ok) throw new Error(`GET cube/.js -> ${res.status}`);
     return res.text();
   }
+
+  /** Publish the tenant's Cube model to GCS for the deployed Cube service. */
+  syncCubeModel(): Promise<CubeSyncResult> {
+    return this.post("/v1/cube/sync", {});
+  }
+}
+
+export interface CubeSyncResult {
+  tenant_id: string;
+  version: string;
+  file_count: number;
+  cube_names: string[];
 }
 
 // --- Cube types (Phase 5) ---

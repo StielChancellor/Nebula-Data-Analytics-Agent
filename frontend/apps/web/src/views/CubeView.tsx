@@ -26,6 +26,8 @@ export function CubeView() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewing, setViewing] = useState<{ id: string; label: string } | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishMsg, setPublishMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -37,6 +39,20 @@ export function CubeView() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRefreshing(false);
+    }
+  }, [client]);
+
+  const publish = useCallback(async () => {
+    setPublishing(true);
+    setPublishMsg(null);
+    try {
+      const r = await client.syncCubeModel();
+      setPublishMsg(`Published ${r.file_count} cube(s) · version ${r.version.slice(0, 12)}`);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPublishing(false);
     }
   }, [client]);
 
@@ -54,14 +70,30 @@ export function CubeView() {
             traces to a confirmed edge (PRD §2). View any schema to see the raw Cube .js.
           </p>
         </div>
-        <button
-          onClick={refresh}
-          disabled={refreshing}
-          className="text-[12px] px-3 py-1.5 rounded border border-ink-700/60 hover:bg-ink-700/40 disabled:opacity-50"
-        >
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="text-[12px] px-3 py-1.5 rounded border border-ink-700/60 hover:bg-ink-700/40 disabled:opacity-50"
+          >
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+          <button
+            onClick={publish}
+            disabled={publishing || items.length === 0}
+            title="Publish the generated schemas to GCS for the Cube service to read"
+            className="text-[12px] px-3 py-1.5 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90 disabled:opacity-50"
+          >
+            {publishing ? "Publishing…" : "Publish to Cube"}
+          </button>
+        </div>
       </header>
+
+      {publishMsg && (
+        <div className="text-[12px] text-emerald-300 border border-emerald-900/60 bg-emerald-950/30 rounded px-2 py-1">
+          {publishMsg}
+        </div>
+      )}
 
       {error && (
         <div className="text-[12px] text-red-400 border border-red-900/60 bg-red-950/40 rounded px-2 py-1">

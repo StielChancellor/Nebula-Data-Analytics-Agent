@@ -1,0 +1,9 @@
+{
+  "name": "insnav-cube-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cube config layer for Insights Navigator — reads the data model from GCS.",
+  "dependencies": {
+    "@google-cloud/storage": "^7.14.0"
+  }
+}

@@ -34,5 +34,11 @@ output "service_accounts" {
     api_gateway     = google_service_account.api_gateway.email
     orchestrator    = google_service_account.orchestrator.email
     compute_sandbox = google_service_account.compute_sandbox.email
+    cube            = google_service_account.cube.email
   }
+}
+
+output "cube_url" {
+  value       = var.enable_cube ? google_cloud_run_v2_service.cube[0].uri : null
+  description = "Cube REST API base URL (set as INSNAV_CUBE_API_URL on the backend)"
 }

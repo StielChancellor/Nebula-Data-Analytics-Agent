@@ -27,13 +27,13 @@ from insnav_graph_store import list_approved_edges
 from pydantic import BaseModel
 
 from services.api_gateway.app.auth import Principal, current_principal
+from services.api_gateway.app.cube_sync_service import sync_tenant
 from services.api_gateway.app.datasets import (
     Dataset,
-    _OFFLINE_COLUMNS,
+    get_column_profiles,
     get_dataset,
     list_datasets_for_tenant,
 )
-from services.api_gateway.app.settings import get_settings
 
 router = APIRouter(tags=["cube"])
 
@@ -53,7 +53,32 @@ class CubeSchemaSummary(BaseModel):
     revenue_touching: bool
 
 
+class CubeSyncResult(BaseModel):
+    tenant_id: str
+    version: str
+    file_count: int
+    cube_names: list[str]
+
+
 # ---------- endpoints ----------
+
+
+@router.post("/v1/cube/sync", response_model=CubeSyncResult)
+def sync_cube_model_endpoint(
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> CubeSyncResult:
+    """
+    Rebuild + publish the caller's tenant Cube model to GCS so the deployed
+    Cube container picks it up. Auto-runs on edge approve; this endpoint is
+    for an explicit on-demand refresh.
+    """
+    result = sync_tenant(principal.tenant_id)
+    return CubeSyncResult(
+        tenant_id=principal.tenant_id,
+        version=result["version"],
+        file_count=result["file_count"],
+        cube_names=result["cube_names"],
+    )
 
 @router.get("/v1/cube/schemas", response_model=list[CubeSchemaSummary])
 def list_schemas(
@@ -67,7 +92,7 @@ def list_schemas(
 
     out: list[CubeSchemaSummary] = []
     for d in datasets:
-        columns = _columns_for(d.id)
+        columns = get_column_profiles(d.id)
         schema = build_cube_schema(
             dataset=d.model_dump(),
             columns=columns,
@@ -132,29 +157,7 @@ def _build_for(dataset_id: str, principal: Principal) -> CubeSchema:
 
     return build_cube_schema(
         dataset=d.model_dump(),
-        columns=_columns_for(d.id),
+        columns=get_column_profiles(d.id),
         edges=edge_dicts,
         cube_name_lookup=cube_name_lookup,
     )
-
-
-def _columns_for(dataset_id: str) -> list[dict]:
-    """
-    Read column profiles for a dataset. Offline mode reads from the in-memory
-    dict the profiler populates; prod reads from the Firestore subcollection.
-    """
-    settings = get_settings()
-    if settings.offline_mode:
-        cols = _OFFLINE_COLUMNS.get(dataset_id, {})
-        return list(cols.values())
-
-    from services.api_gateway.app.gcp_clients import firestore_client
-
-    docs = (
-        firestore_client()
-        .collection(settings.fs_datasets_collection)
-        .document(dataset_id)
-        .collection("columns")
-        .stream()
-    )
-    return [d.to_dict() or {} for d in docs]
