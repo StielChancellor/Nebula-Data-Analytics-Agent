@@ -91,6 +91,21 @@ variable "enable_identity_platform_tenant" {
   EOT
 }
 
+variable "enable_cube_store" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Phase 5c: run a Cube Store sidecar in the Cube service so Cube runs in
+    PRODUCTION mode (JWT enforced, no Playground) instead of dev mode. Durable
+    Cube Store data lives in GCS. Default off.
+
+    Cost note: with min_instance_count = 0 it scales to zero ($0 idle) but the
+    Cube Store metastore cold-starts per request. A true production Cube Store
+    wants always-on (min_instance_count = 1) which costs > $5/mo — that exceeds
+    the cost guardrail and needs explicit approval (change the scaling block).
+  EOT
+}
+
 variable "cube_dev_mode" {
   type        = bool
   default     = false

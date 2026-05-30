@@ -212,7 +212,7 @@ resource "google_project_iam_member" "cube" {
   for_each = toset([
     "roles/bigquery.dataViewer",          # read the raw tables to answer queries
     "roles/bigquery.jobUser",             # run the compiled SQL
-    "roles/storage.objectViewer",         # read the data model from GCS
+    "roles/storage.objectUser",           # read the data model + read/write Cube Store data (Phase 5c)
     "roles/secretmanager.secretAccessor", # read the cube API secret
   ])
   project = var.project_id
@@ -292,6 +292,19 @@ resource "google_cloud_run_v2_service" "cube" {
           cpu    = "1"
           memory = "1Gi"
         }
+        # Faster cold start (helps Cube bind 8080 + connect to the Cube Store
+        # sidecar before the startup probe gives up).
+        startup_cpu_boost = true
+      }
+      # Generous startup window: in prod mode Cube waits for the Cube Store
+      # sidecar (localhost:3030) before binding 8080. Default probe is too
+      # impatient for a two-container cold start. Allow up to ~150s.
+      startup_probe {
+        tcp_socket { port = 8080 }
+        initial_delay_seconds = 20
+        timeout_seconds       = 5
+        period_seconds        = 10
+        failure_threshold     = 13
       }
       env {
         name  = "CUBEJS_DB_TYPE"
@@ -303,10 +316,25 @@ resource "google_cloud_run_v2_service" "cube" {
       }
       env {
         name = "CUBEJS_DEV_MODE"
-        # Secure default false (prod mode → needs a separate Cube Store). Set
-        # cube_dev_mode=true in terraform.tfvars for a single-container MVP
-        # (embedded Cube Store) — keep the service PRIVATE when you do.
-        value = var.cube_dev_mode ? "true" : "false"
+        # Prod mode (false) when a Cube Store sidecar is present (Phase 5c).
+        # Otherwise honor cube_dev_mode (true → embedded store, single container;
+        # keep the service PRIVATE in that case).
+        value = (var.cube_dev_mode && !var.enable_cube_store) ? "true" : "false"
+      }
+      # Phase 5c: point Cube at the Cube Store sidecar (shared localhost).
+      dynamic "env" {
+        for_each = var.enable_cube_store ? [1] : []
+        content {
+          name  = "CUBEJS_CUBESTORE_HOST"
+          value = "localhost"
+        }
+      }
+      dynamic "env" {
+        for_each = var.enable_cube_store ? [1] : []
+        content {
+          name  = "CUBEJS_CUBESTORE_PORT"
+          value = "3030"
+        }
       }
       env {
         name  = "INSNAV_CUBE_MODEL_BUCKET"
@@ -326,9 +354,43 @@ resource "google_cloud_run_v2_service" "cube" {
         }
       }
     }
+
+    # Phase 5c: Cube Store sidecar (prod-mode query/cache engine). Shares
+    # localhost with the cube container; durable data lives in GCS. Only one
+    # container in the service has `ports` (the cube API ingress), so this is a
+    # sidecar. Cube Store metastore prefers a single instance — see scaling.
+    dynamic "containers" {
+      for_each = var.enable_cube_store ? [1] : []
+      content {
+        name  = "cubestore"
+        image = "cubejs/cubestore:latest"
+        resources {
+          limits = {
+            cpu    = "1"
+            memory = "1Gi"
+          }
+        }
+        env {
+          name  = "CUBESTORE_SERVER_NAME"
+          value = "localhost:3030"
+        }
+        env {
+          name  = "CUBESTORE_GCS_BUCKET"
+          value = "${var.project_id}-staging"
+        }
+        env {
+          name  = "CUBESTORE_GCS_SUB_PATH"
+          value = "cubestore"
+        }
+      }
+    }
+
     scaling {
       min_instance_count = 0
-      max_instance_count = 3
+      # Cube Store metastore is safest with a single instance; cap at 1 when it
+      # runs. (A production always-on Cube Store wants min_instance_count = 1,
+      # which costs > $5/mo — flip that on only with explicit approval.)
+      max_instance_count = var.enable_cube_store ? 1 : 3
     }
   }
   depends_on = [
