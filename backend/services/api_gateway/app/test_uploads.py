@@ -208,6 +208,20 @@ class TestRobustIngestion:
         # offline synthetic sample is "city,revenue\nMumbai,125\nPune,50"
         assert names == {"city": "STRING", "revenue": "INT64"}
 
+    def test_preview_persisted_without_nested_arrays(self, client: TestClient) -> None:
+        # Firestore rejects nested arrays; row_sample (list-of-lists) must be
+        # dropped from the STORED preview but kept in the response. (Live-only bug.)
+        h = _auth_headers(client)
+        ds_id = client.post(
+            "/v1/uploads/start", headers=h, json={"filename": "f.csv", "size_bytes": 100}
+        ).json()["dataset_id"]
+        resp = client.post("/v1/uploads/preview", headers=h, json={"dataset_id": ds_id}).json()
+        assert "row_sample" in resp  # response keeps it for the UI
+        stored = client.get(f"/v1/datasets/{ds_id}", headers=h).json()["preview"]
+        assert stored is not None
+        assert "row_sample" not in stored  # persisted copy drops the nested array
+        assert "columns" in stored
+
     def test_complete_with_overrides_threads_schema(self, client: TestClient) -> None:
         h = _auth_headers(client)
         ds_id = client.post(

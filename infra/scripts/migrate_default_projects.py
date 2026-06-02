@@ -73,7 +73,7 @@ def main() -> None:
             d.project_id = proj.id
             save_dataset(d)
             add_dataset_to_project(proj.id, d.id)
-            print(f"   ↳ {d.id} ({d.label}) → project {proj.id}")
+            print(f"   - {d.id} ({d.label}) -> project {proj.id}")
 
         result = sync_project(tenant, proj.id)
         print(f"[{tenant}] cube re-synced: {result['file_count']} file(s), version {result['version'][:12]}")

@@ -213,7 +213,11 @@ def preview_upload(
     sample = _read_sample_bytes(ds)
     result = sniff_csv(sample, ds.locale_hint)
     # Persist the preview so /complete can default to it and the UI can reload.
-    update_dataset_status(ds.id, ds.status, preview=result)
+    # Firestore rejects nested arrays, so drop row_sample (list-of-lists) from the
+    # stored copy — /complete only needs the per-column inferred types. The
+    # response below still returns the full sniff result for the UI.
+    persisted = {k: v for k, v in result.items() if k != "row_sample"}
+    update_dataset_status(ds.id, ds.status, preview=persisted)
 
     return PreviewResponse(
         dataset_id=ds.id,
