@@ -1,3 +1,7 @@
+# NOT DEPLOYED - Phase-0 scaffold only. The real logic runs IN-PROCESS in
+# services/api_gateway (swarm/onboarding/ingestion/edge_proposer). This file is
+# an extraction boundary for future independent scaling; no Cloud Run resource
+# points at it. See backend/README.md.
 """
 compute_sandbox — Cloud Run JOB invoked PER INVOCATION (not a long-running
 service). Pinned image (numpy/pandas/scipy/statsmodels/prophet/lifelines/pymc),

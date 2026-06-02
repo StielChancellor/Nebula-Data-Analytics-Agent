@@ -1,3 +1,7 @@
+# NOT DEPLOYED - Phase-0 scaffold only. The real logic runs IN-PROCESS in
+# services/api_gateway (swarm/onboarding/ingestion/edge_proposer). This file is
+# an extraction boundary for future independent scaling; no Cloud Run resource
+# points at it. See backend/README.md.
 """
 orchestrator — hosts all 7 agents in-process v1 (per PRD D5).
 
