@@ -31,6 +31,7 @@ from services.api_gateway.app.chat_router import router as chat_router
 from services.api_gateway.app.cube_router import router as cube_router
 from services.api_gateway.app.datasets_router import router as datasets_router
 from services.api_gateway.app.edges_router import router as edges_router
+from services.api_gateway.app.ingest_router import router as ingest_router
 from services.api_gateway.app.projects_router import router as projects_router
 from services.api_gateway.app.settings import get_settings
 from services.api_gateway.app.uploads import router as uploads_router
@@ -136,3 +137,4 @@ app.include_router(edges_router)
 app.include_router(cube_router)
 app.include_router(chat_router)
 app.include_router(projects_router)
+app.include_router(ingest_router)

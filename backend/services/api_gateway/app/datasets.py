@@ -334,6 +334,38 @@ def delete_dataset_record(dataset_id: str) -> None:
     doc.delete()
 
 
+def save_column_semantics(dataset_id: str, semantics: dict[str, dict[str, Any]]) -> None:
+    """
+    Merge human-confirmed ColumnSemantics onto the existing columns subcollection
+    (Phase 10-C). The Cube generator then reads role/is_revenue/aggregation/etc.
+    off the same column dict that already carries the profile stats — no second
+    read path. `semantics` maps column name -> semantics fields (the `column`
+    key, if present, is dropped since the doc is already keyed by name).
+    """
+    cleaned = {
+        name: {k: v for k, v in sem.items() if k != "column"}
+        for name, sem in semantics.items()
+    }
+    if _offline():
+        cols = _OFFLINE_COLUMNS.setdefault(dataset_id, {})
+        for name, sem in cleaned.items():
+            existing = cols.setdefault(name, {"name": name})
+            existing.update(sem)
+        return
+
+    from services.api_gateway.app.gcp_clients import firestore_client
+    from services.api_gateway.app.settings import get_settings
+
+    col = (
+        firestore_client()
+        .collection(get_settings().fs_datasets_collection)
+        .document(dataset_id)
+        .collection("columns")
+    )
+    for name, sem in cleaned.items():
+        col.document(name).set(sem, merge=True)
+
+
 def update_dataset_status(
     dataset_id: str,
     status: DatasetStatus,
