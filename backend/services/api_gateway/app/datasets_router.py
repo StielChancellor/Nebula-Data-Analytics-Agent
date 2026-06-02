@@ -22,6 +22,17 @@ from services.api_gateway.app.datasets import (
 router = APIRouter(tags=["datasets"])
 
 
+class DeleteDatasetResponse(BaseModel):
+    dataset_id: str
+    deleted: bool
+    # What was cleaned up, for transparency in the UI.
+    edges: int = 0
+    bq_table: bool = False
+    gcs_blob: bool = False
+    firestore: bool = False
+    cube_resynced: bool = False
+
+
 class DatasetListItem(BaseModel):
     id: str
     label: str
@@ -64,3 +75,27 @@ def get_dataset(
         # Don't leak existence; same 404 as missing
         raise HTTPException(status.HTTP_404_NOT_FOUND, "dataset not found")
     return d
+
+
+@router.delete("/v1/datasets/{dataset_id}", response_model=DeleteDatasetResponse)
+def delete_dataset(
+    dataset_id: str,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> DeleteDatasetResponse:
+    """
+    Fully delete a dataset: graph edges, BQ raw table, GCS blob, Firestore doc
+    + columns, project association, and re-publish the Cube model. Idempotent
+    and tenant-scoped (a missing/foreign dataset returns deleted=false).
+    """
+    from services.api_gateway.app.datasets_cleanup import delete_dataset_fully
+
+    summary = delete_dataset_fully(dataset_id, principal)
+    return DeleteDatasetResponse(
+        dataset_id=dataset_id,
+        deleted=bool(summary.get("deleted")),
+        edges=int(summary.get("edges", 0)),
+        bq_table=bool(summary.get("bq_table")),
+        gcs_blob=bool(summary.get("gcs_blob")),
+        firestore=bool(summary.get("firestore")),
+        cube_resynced=bool(summary.get("cube_resynced")),
+    )

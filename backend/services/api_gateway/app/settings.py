@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     upload_signed_url_ttl_seconds: int = Field(
         default=3600, alias="INSNAV_UPLOAD_TTL_SECONDS"
     )
+    # Read-before-commit preview (Phase 10-B): how many bytes of the uploaded
+    # blob to sniff. 64 KB is plenty to infer types and is file-size-independent.
+    preview_sample_bytes: int = Field(default=65536, alias="INSNAV_PREVIEW_SAMPLE_BYTES")
 
     # When true, skip live GCP calls (used in pytest). Defaults to detecting
     # the env var PYTEST_CURRENT_TEST so test runs are offline by default.
