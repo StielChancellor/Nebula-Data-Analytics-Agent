@@ -25,7 +25,7 @@ import datetime as dt
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from services.api_gateway.app.auth import Principal, current_principal
@@ -90,6 +90,7 @@ class CompleteUploadResponse(BaseModel):
 @router.post("/start", response_model=StartUploadResponse)
 def start_upload(
     req: StartUploadRequest,
+    request: Request,
     principal: Annotated[Principal, Depends(current_principal)],
 ) -> StartUploadResponse:
     settings = get_settings()
@@ -103,10 +104,19 @@ def start_upload(
     dataset_id = new_dataset_id()
     blob_path = gcs_blob_path(dataset_id, req.filename)
 
+    # The browser will PUT the file directly to GCS cross-origin. A resumable
+    # session created server-side carries no Origin, so GCS won't emit
+    # Access-Control-Allow-Origin on the client's PUT and the browser blocks it
+    # (even with bucket CORS = "*"). Binding the session to the caller's Origin
+    # fixes this and is multi-brand-safe: whatever frontend origin calls us gets
+    # bound to its own session.
+    origin = request.headers.get("origin")
+
     signed_url, expires_at = _create_resumable_upload_url(
         blob_path=blob_path,
         content_type="text/csv",  # CSV-only v1
         ttl_seconds=settings.upload_signed_url_ttl_seconds,
+        origin=origin,
     )
 
     ds = Dataset(
@@ -182,10 +192,19 @@ def complete_upload(
 
 # ---------- GCP integration (real calls; mocked in tests) ----------
 
-def _create_resumable_upload_url(blob_path: str, content_type: str, ttl_seconds: int) -> tuple[str, str]:
+def _create_resumable_upload_url(
+    blob_path: str,
+    content_type: str,
+    ttl_seconds: int,
+    origin: str | None = None,
+) -> tuple[str, str]:
     """
     Returns (signed_url, expires_at_iso). For dev/test without GCP creds,
     returns a placeholder URL so tests can run offline.
+
+    `origin` is the browser origin that will PUT the bytes. Passing it binds
+    the resumable session to that origin so GCS returns the CORS headers the
+    browser needs (see start_upload for why this is required).
     """
     settings = get_settings()
     if settings.offline_mode:
@@ -199,9 +218,13 @@ def _create_resumable_upload_url(blob_path: str, content_type: str, ttl_seconds:
     bucket = storage_client().bucket(settings.staging_bucket)
     blob = bucket.blob(blob_path)
     # Use create_resumable_upload_session — this returns a session URL the
-    # client PUTs the chunks to. The bucket's CORS (set in Terraform) lets
-    # the browser do this from any origin.
-    url = blob.create_resumable_upload_session(content_type=content_type, size=None)
+    # client PUTs the chunks to. `origin` binds the session to the calling
+    # browser origin so the cross-origin PUT passes CORS (the bucket CORS
+    # config is "*", but a server-initiated session needs the origin echoed
+    # here or GCS omits Access-Control-Allow-Origin on the PUT response).
+    url = blob.create_resumable_upload_session(
+        content_type=content_type, size=None, origin=origin
+    )
     expires_at = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=ttl_seconds)).isoformat()
     return url, expires_at
 

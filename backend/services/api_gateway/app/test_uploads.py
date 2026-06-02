@@ -32,6 +32,26 @@ class TestStartUpload:
         assert "uploads/" in body["gcs_blob_path"]
         assert body["gcs_blob_path"].endswith("sales.csv")
 
+    def test_binds_resumable_session_to_caller_origin(self, client: TestClient) -> None:
+        """The browser PUTs cross-origin to GCS; the resumable session must be
+        bound to the caller's Origin or GCS omits Access-Control-Allow-Origin on
+        the PUT and the browser blocks the upload. Regression guard for that
+        wiring (only reproducible against a live GCS resumable session)."""
+        from unittest.mock import patch
+
+        origin = "https://brand-x.example.app"
+        with patch(
+            "services.api_gateway.app.uploads._create_resumable_upload_url",
+            return_value=("https://example.invalid/u", "2099-01-01T00:00:00+00:00"),
+        ) as m:
+            r = client.post(
+                "/v1/uploads/start",
+                headers={**_auth_headers(client), "Origin": origin},
+                json={"filename": "sales.csv", "size_bytes": 1000},
+            )
+        assert r.status_code == 200, r.text
+        assert m.call_args.kwargs["origin"] == origin
+
     def test_requires_auth(self, client: TestClient) -> None:
         r = client.post("/v1/uploads/start", json={"filename": "x.csv", "size_bytes": 10})
         assert r.status_code == 401
