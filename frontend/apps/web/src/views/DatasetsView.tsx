@@ -10,12 +10,19 @@ import {
   ApiClient,
   type DatasetListItem,
   type DatasetStatus,
+  type RegionCode,
   uploadToGcs,
 } from "@insnav/api-client";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
-export function DatasetsView() {
+interface DatasetsViewProps {
+  projectId?: string;
+  localeDefault?: RegionCode;
+  onOnboard?: (datasetId: string) => void;
+}
+
+export function DatasetsView({ projectId, localeDefault = "US", onOnboard }: DatasetsViewProps = {}) {
   const auth = useAuth();
   const client = useMemo(
     () => new ApiClient({ baseUrl: API_BASE, getToken: auth.getToken }),
@@ -28,14 +35,14 @@ export function DatasetsView() {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const list = await client.listDatasets();
+      const list = await client.listDatasets(projectId);
       setItems(list);
     } catch (e) {
       console.error("listDatasets failed", e);
     } finally {
       setRefreshing(false);
     }
-  }, [client]);
+  }, [client, projectId]);
 
   useEffect(() => {
     void refresh();
@@ -70,16 +77,20 @@ export function DatasetsView() {
       {items.length === 0 ? (
         <EmptyState onUpload={() => setShowUpload(true)} />
       ) : (
-        <DatasetTable items={items} />
+        <DatasetTable items={items} client={client} onChanged={refresh} onOnboard={onOnboard} />
       )}
 
       {showUpload && (
         <UploadDialog
           client={client}
+          projectId={projectId}
+          localeDefault={localeDefault}
           onClose={() => setShowUpload(false)}
-          onUploaded={() => {
+          onUploaded={(datasetId, status) => {
             setShowUpload(false);
             void refresh();
+            // A successful, project-scoped upload flows straight into onboarding.
+            if (status === "ready" && projectId && onOnboard) onOnboard(datasetId);
           }}
         />
       )}
@@ -112,7 +123,32 @@ const STATUS_STYLES: Record<DatasetStatus, string> = {
   failed: "bg-red-900/40 text-red-300",
 };
 
-function DatasetTable({ items }: { items: DatasetListItem[] }) {
+function DatasetTable({
+  items,
+  client,
+  onChanged,
+  onOnboard,
+}: {
+  items: DatasetListItem[];
+  client: ApiClient;
+  onChanged: () => void;
+  onOnboard?: (datasetId: string) => void;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const del = async (id: string) => {
+    if (!window.confirm("Delete this dataset? This removes its BigQuery table, file, edges, and cube entry.")) return;
+    setBusyId(id);
+    try {
+      await client.deleteDataset(id);
+      onChanged();
+    } catch (e) {
+      console.error("delete failed", e);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="border border-ink-700/60 rounded-lg overflow-hidden">
       <table className="w-full text-[12px]">
@@ -123,7 +159,7 @@ function DatasetTable({ items }: { items: DatasetListItem[] }) {
             <th className="text-right px-3 py-2 font-medium">Rows</th>
             <th className="text-right px-3 py-2 font-medium">Columns</th>
             <th className="text-left px-3 py-2 font-medium">Locale</th>
-            <th className="text-left px-3 py-2 font-medium">Updated</th>
+            <th className="text-right px-3 py-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -140,8 +176,22 @@ function DatasetTable({ items }: { items: DatasetListItem[] }) {
               </td>
               <td className="px-3 py-2 text-right font-mono numeric">{d.column_count ?? "—"}</td>
               <td className="px-3 py-2 text-ink-300">{d.locale_hint}</td>
-              <td className="px-3 py-2 text-ink-300 font-mono text-[11px]">
-                {new Date(d.last_refreshed).toLocaleString()}
+              <td className="px-3 py-2 text-right whitespace-nowrap">
+                {onOnboard && d.status === "ready" && (
+                  <button
+                    onClick={() => onOnboard(d.id)}
+                    className="text-[11px] px-2 py-1 rounded bg-accent/15 text-accent-glow hover:bg-accent/25 mr-1"
+                  >
+                    Onboard
+                  </button>
+                )}
+                <button
+                  onClick={() => del(d.id)}
+                  disabled={busyId === d.id}
+                  className="text-[11px] px-2 py-1 rounded border border-red-900/50 text-red-300 hover:bg-red-950/40 disabled:opacity-50"
+                >
+                  {busyId === d.id ? "…" : "Delete"}
+                </button>
               </td>
             </tr>
           ))}
@@ -155,11 +205,13 @@ type UploadPhase = "select" | "uploading" | "completing" | "polling" | "done" | 
 
 interface UploadDialogProps {
   client: ApiClient;
+  projectId?: string;
+  localeDefault?: RegionCode;
   onClose: () => void;
-  onUploaded: () => void;
+  onUploaded: (datasetId: string, status: DatasetStatus) => void;
 }
 
-function UploadDialog({ client, onClose, onUploaded }: UploadDialogProps) {
+function UploadDialog({ client, projectId, localeDefault = "US", onClose, onUploaded }: UploadDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [phase, setPhase] = useState<UploadPhase>("select");
   const [progress, setProgress] = useState(0); // 0..1
@@ -178,8 +230,11 @@ function UploadDialog({ client, onClose, onUploaded }: UploadDialogProps) {
     if (!file) return;
     setError(null);
     try {
-      // Step 1: start
-      const start = await client.startUpload(file.name, file.size, { locale_hint: "US" });
+      // Step 1: start (scoped to the project; locale inherited from it)
+      const start = await client.startUpload(file.name, file.size, {
+        locale_hint: localeDefault,
+        ...(projectId ? { project_id: projectId } : {}),
+      });
       setDatasetId(start.dataset_id);
 
       // Step 2: PUT to GCS with progress
@@ -191,7 +246,8 @@ function UploadDialog({ client, onClose, onUploaded }: UploadDialogProps) {
       // Step 3: complete (kicks off BQ load + profile)
       setPhase("completing");
       const done = await client.completeUpload(start.dataset_id);
-      setStatus(done.status);
+      let finalStatus: DatasetStatus = done.status;
+      setStatus(finalStatus);
 
       // Step 4: poll until ready (in the synchronous v1 flow, status will
       // be "ready" or "failed" immediately, but the loop handles future
@@ -199,12 +255,13 @@ function UploadDialog({ client, onClose, onUploaded }: UploadDialogProps) {
       setPhase("polling");
       for (let i = 0; i < 60; i += 1) {
         const cur = await client.getDataset(start.dataset_id);
-        setStatus(cur.status);
-        if (cur.status === "ready" || cur.status === "failed") break;
+        finalStatus = cur.status;
+        setStatus(finalStatus);
+        if (finalStatus === "ready" || finalStatus === "failed") break;
         await new Promise((r) => setTimeout(r, 1000));
       }
       setPhase("done");
-      onUploaded();
+      onUploaded(start.dataset_id, finalStatus);
     } catch (e) {
       console.error("upload failed", e);
       setError(e instanceof Error ? e.message : String(e));

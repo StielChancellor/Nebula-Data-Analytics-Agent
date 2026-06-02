@@ -35,6 +35,7 @@ class DeleteDatasetResponse(BaseModel):
 
 class DatasetListItem(BaseModel):
     id: str
+    project_id: str | None = None
     label: str
     locale_hint: Literal["US", "IN"]
     status: str
@@ -47,11 +48,15 @@ class DatasetListItem(BaseModel):
 @router.get("/v1/me/datasets", response_model=list[DatasetListItem])
 def list_my_datasets(
     principal: Annotated[Principal, Depends(current_principal)],
+    project_id: str | None = None,
 ) -> list[DatasetListItem]:
     items = list_datasets_for_tenant(principal.tenant_id)
+    if project_id is not None:
+        items = [d for d in items if d.project_id == project_id]
     return [
         DatasetListItem(
             id=d.id,
+            project_id=d.project_id,
             label=d.label,
             locale_hint=d.locale_hint,
             status=d.status,

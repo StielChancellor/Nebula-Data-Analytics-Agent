@@ -17,6 +17,7 @@ export type DatasetStatus =
 
 export interface DatasetListItem {
   id: string;
+  project_id: string | null;
   label: string;
   locale_hint: RegionCode;
   status: DatasetStatus;
@@ -29,6 +30,7 @@ export interface DatasetListItem {
 export interface Dataset {
   id: string;
   tenant_id: string;
+  project_id: string | null;
   brand: string;
   label: string;
   locale_hint: RegionCode;
@@ -42,6 +44,8 @@ export interface Dataset {
   created_at: string;
   updated_at: string;
   error: string | null;
+  error_detail?: IngestError | null;
+  preview?: Record<string, unknown> | null;
 }
 
 export interface StartUploadResponse {
@@ -58,6 +62,7 @@ export interface CompleteUploadResponse {
   row_count: number | null;
   column_count: number | null;
   error: string | null;
+  error_detail?: IngestError | null;
   /** Phase 4: how many edges the auto-discoverer proposed for this dataset */
   new_edge_proposals: number;
 }
@@ -127,22 +132,89 @@ export class ApiClient {
     return (await res.json()) as T;
   }
 
+  async patch<T>(path: string, body: unknown): Promise<T> {
+    const headers = await this.authHeaders();
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`PATCH ${path} -> ${res.status}: ${text}`);
+    }
+    return (await res.json()) as T;
+  }
+
+  async del<T>(path: string): Promise<T | null> {
+    const headers = await this.authHeaders();
+    const res = await fetch(`${this.baseUrl}${path}`, { method: "DELETE", headers });
+    if (!res.ok) throw new Error(`DELETE ${path} -> ${res.status}`);
+    const text = await res.text();
+    return text ? (JSON.parse(text) as T) : null;
+  }
+
   // --- Typed convenience methods (replace with codegen later) ---
 
-  listDatasets(): Promise<DatasetListItem[]> {
-    return this.get("/v1/me/datasets");
+  listDatasets(projectId?: string): Promise<DatasetListItem[]> {
+    return this.get(`/v1/me/datasets${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`);
   }
 
   getDataset(id: string): Promise<Dataset> {
     return this.get(`/v1/datasets/${id}`);
   }
 
-  startUpload(filename: string, sizeBytes: number, opts: { label?: string; locale_hint?: RegionCode } = {}): Promise<StartUploadResponse> {
+  startUpload(
+    filename: string,
+    sizeBytes: number,
+    opts: { label?: string; locale_hint?: RegionCode; project_id?: string } = {},
+  ): Promise<StartUploadResponse> {
     return this.post("/v1/uploads/start", { filename, size_bytes: sizeBytes, ...opts });
   }
 
-  completeUpload(datasetId: string): Promise<CompleteUploadResponse> {
-    return this.post("/v1/uploads/complete", { dataset_id: datasetId });
+  /** Read-before-commit: sniff the uploaded blob and return an overridable schema. */
+  previewUpload(datasetId: string): Promise<PreviewResponse> {
+    return this.post("/v1/uploads/preview", { dataset_id: datasetId });
+  }
+
+  completeUpload(datasetId: string, schemaOverrides?: ColumnSpec[]): Promise<CompleteUploadResponse> {
+    return this.post("/v1/uploads/complete", {
+      dataset_id: datasetId,
+      ...(schemaOverrides ? { schema_overrides: schemaOverrides } : {}),
+    });
+  }
+
+  /** Fully delete a dataset (BQ table + GCS blob + edges + Firestore + cube re-sync). */
+  deleteDataset(id: string): Promise<DeleteDatasetResult | null> {
+    return this.del(`/v1/datasets/${id}`);
+  }
+
+  // --- Projects (Phase 10) ---
+  listProjects(): Promise<Project[]> {
+    return this.get("/v1/projects");
+  }
+  getProject(id: string): Promise<Project> {
+    return this.get(`/v1/projects/${id}`);
+  }
+  createProject(body: { name: string; description?: string; locale_default?: RegionCode }): Promise<Project> {
+    return this.post("/v1/projects", body);
+  }
+  updateProject(id: string, body: Partial<{ name: string; description: string; locale_default: RegionCode; status: ProjectStatus }>): Promise<Project> {
+    return this.patch(`/v1/projects/${id}`, body);
+  }
+  deleteProject(id: string): Promise<void> {
+    return this.del(`/v1/projects/${id}`).then(() => undefined);
+  }
+
+  // --- Agent-led onboarding (Phase 10) ---
+  startIngestSession(datasetId: string, llm?: string): Promise<SessionResponse> {
+    return this.post("/v1/ingest/sessions", { dataset_id: datasetId, llm });
+  }
+  replyToIngest(sessionId: string, body: IngestReply): Promise<SessionResponse> {
+    return this.post(`/v1/ingest/sessions/${sessionId}/reply`, body);
+  }
+  getIngestSession(sessionId: string): Promise<SessionResponse> {
+    return this.get(`/v1/ingest/sessions/${sessionId}`);
   }
 
   // --- Edges ---
@@ -190,9 +262,14 @@ export class ApiClient {
     return this.post("/v1/cube/sync", {});
   }
 
-  /** Ask the agent swarm a natural-language question (optionally pick the brain). */
-  chat(question: string, datasetIds: string[] = [], llm?: string): Promise<ChatAnswer> {
-    return this.post("/v1/chat", { question, dataset_ids: datasetIds, llm });
+  /** Ask the agent swarm a natural-language question, scoped to a project. */
+  chat(question: string, opts: { datasetIds?: string[]; llm?: string; projectId?: string } = {}): Promise<ChatAnswer> {
+    return this.post("/v1/chat", {
+      question,
+      dataset_ids: opts.datasetIds ?? [],
+      llm: opts.llm,
+      project_id: opts.projectId,
+    });
   }
 
   /** Available LLM "brains" for the dropdown. */
@@ -340,4 +417,147 @@ export function uploadToGcs(
     xhr.onerror = () => reject(new Error("GCS PUT network error"));
     xhr.send(file);
   });
+}
+
+// ===================== Phase 10: Projects + Onboarding =====================
+
+export type ProjectStatus = "draft" | "active" | "archived";
+
+export interface ProjectMember {
+  email: string;
+  role: "owner" | "admin" | "viewer";
+}
+
+export interface Project {
+  id: string;
+  tenant_id: string;
+  brand: string;
+  name: string;
+  description: string;
+  owner_email: string;
+  members: ProjectMember[];
+  locale_default: RegionCode;
+  status: ProjectStatus;
+  dataset_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type ColumnRole = "dimension" | "measure" | "time" | "identifier" | "ignore";
+export type MeasureAgg = "sum" | "avg" | "count" | "min" | "max" | "count_distinct";
+
+export interface ColumnSemantics {
+  column: string;
+  role: ColumnRole;
+  business_meaning?: string;
+  is_revenue?: boolean;
+  is_cost?: boolean;
+  measure_aggregation?: MeasureAgg | null;
+  date_granularity?: string | null;
+  join_key?: boolean;
+  display_title?: string | null;
+  confirmed_by?: string | null;
+  confirmed_at?: string | null;
+}
+
+export type InterviewStep =
+  | "project_name" | "grain" | "draft_review" | "joins" | "confirm" | "done";
+export type QuestionType = "free_text" | "single_choice" | "confirm" | "draft_review";
+
+export interface AgentQuestion {
+  step: InterviewStep;
+  prompt: string;
+  question_type: QuestionType;
+  choices: string[];
+  target_column: string | null;
+  draft: ColumnSemantics[];
+  context: Record<string, unknown>;
+}
+
+export interface TranscriptEntry {
+  role: "agent" | "user";
+  step: InterviewStep;
+  text: string;
+  ts: string;
+}
+
+export interface IngestSession {
+  id: string;
+  tenant_id: string;
+  project_id: string | null;
+  dataset_id: string;
+  status: "in_progress" | "completed" | "abandoned";
+  current_step: InterviewStep;
+  columns_remaining: string[];
+  current_column: string | null;
+  semantics: Record<string, ColumnSemantics>;
+  grain_description: string | null;
+  confirmed_join_edge_ids: string[];
+  transcript: TranscriptEntry[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompletionResult {
+  project_id: string | null;
+  cube_synced: boolean;
+  columns_confirmed: number;
+  joins_approved: number;
+}
+
+export interface SessionResponse {
+  session: IngestSession;
+  agent_message: AgentQuestion | null;
+  completion: CompletionResult | null;
+}
+
+export interface IngestReply {
+  answer?: string;
+  semantics_patch?: ColumnSemantics[];
+  confirmed_edge_ids?: string[];
+  llm?: string;
+}
+
+// ---- robust ingestion ----
+
+export interface ColumnSpec {
+  name: string;
+  bq_type: string;
+  source_format?: string | null;
+}
+
+export interface PreviewColumn {
+  name: string;
+  inferred_bq_type: string;
+  inferred_format: string | null;
+  sample_values: string[];
+  nullable: boolean;
+}
+
+export interface PreviewResponse {
+  dataset_id: string;
+  encoding: string;
+  delimiter: string;
+  has_header: boolean;
+  columns: PreviewColumn[];
+  row_sample: string[][];
+  truncated: boolean;
+}
+
+export interface IngestError {
+  stage: "upload" | "preview" | "load" | "profile" | "discover";
+  reason: string;
+  message: string;
+  hint: string | null;
+  sample_bad_rows: string[];
+}
+
+export interface DeleteDatasetResult {
+  dataset_id: string;
+  deleted: boolean;
+  edges: number;
+  bq_table: boolean;
+  gcs_blob: boolean;
+  firestore: boolean;
+  cube_resynced: boolean;
 }

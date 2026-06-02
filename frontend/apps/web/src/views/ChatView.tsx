@@ -11,7 +11,7 @@ import { useAuth } from "@insnav/auth";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
-export function ChatView() {
+export function ChatView({ projectId }: { projectId?: string } = {}) {
   const auth = useAuth();
   const client = useMemo(
     () => new ApiClient({ baseUrl: API_BASE, getToken: auth.getToken }),
@@ -41,7 +41,7 @@ export function ChatView() {
     setBusy(true);
     setError(null);
     try {
-      setAnswer(await client.chat(question.trim(), [], model || undefined));
+      setAnswer(await client.chat(question.trim(), { llm: model || undefined, projectId }));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
