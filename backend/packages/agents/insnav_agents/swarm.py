@@ -251,11 +251,11 @@ def run_specialist_analysis(
             return stats.run_analysis("forecast", series=series, periods=int(directive.get("periods", 3)))
         return stats.run_analysis(method, values=series)
 
-    if method == "correlation":
+    if method in ("correlation", "regression"):
         x, y = column(directive.get("x_field")), column(directive.get("y_field"))
         if not x or not y:
-            return stats._envelope("correlation", {}, confidence=0.0, caveats=["x_field/y_field not in result"])
-        return stats.run_analysis("correlation", x=x, y=y)
+            return stats._envelope(method, {}, confidence=0.0, caveats=["x_field/y_field not in result"])
+        return stats.run_analysis(method, x=x, y=y)
 
     if method == "significance":
         vi = col_index.get(directive.get("value_field"))

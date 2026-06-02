@@ -372,6 +372,14 @@ export class ApiClient {
   checkAssumptions(projectId: string, spec: TileSpec): Promise<AssumptionReport> {
     return this.post("/v1/assumptions/check", { project_id: projectId, spec });
   }
+
+  // --- Phase 12: X-ray proactive insights ---
+  xraySuggest(projectId: string): Promise<SuggestedTile[]> {
+    return this.post("/v1/xray/suggest", { project_id: projectId });
+  }
+  xrayDashboard(projectId: string, name?: string): Promise<XrayDashboardResult> {
+    return this.post("/v1/xray/dashboard", { project_id: projectId, ...(name ? { name } : {}) });
+  }
 }
 
 export interface LlmOption {
@@ -889,4 +897,16 @@ export interface AssumptionWarning {
 export interface AssumptionReport {
   warnings: AssumptionWarning[];
   ok: boolean;
+}
+
+export interface SuggestedTile {
+  title: string;
+  spec: TileSpec;
+  rationale: string;
+}
+
+export interface XrayDashboardResult {
+  dashboard_id: string;
+  name: string;
+  tile_count: number;
 }

@@ -40,6 +40,7 @@ from services.api_gateway.app.notebook_router import router as notebook_router
 from services.api_gateway.app.pivot_router import router as pivot_router
 from services.api_gateway.app.projects_router import router as projects_router
 from services.api_gateway.app.snapshots_router import router as snapshots_router
+from services.api_gateway.app.xray_router import router as xray_router
 from services.api_gateway.app.settings import get_settings
 from services.api_gateway.app.uploads import router as uploads_router
 
@@ -155,3 +156,4 @@ app.include_router(metrics_router)
 app.include_router(notebook_router)
 app.include_router(cohorts_router)
 app.include_router(snapshots_router)
+app.include_router(xray_router)

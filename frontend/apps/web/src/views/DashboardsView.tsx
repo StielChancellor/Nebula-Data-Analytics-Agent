@@ -30,6 +30,8 @@ export function DashboardsView({ projectId }: { projectId: string }) {
   }, [client, projectId]);
   useEffect(refresh, [refresh]);
 
+  const [generating, setGenerating] = useState(false);
+
   const create = async () => {
     if (!name.trim()) return;
     try {
@@ -39,6 +41,21 @@ export function DashboardsView({ projectId }: { projectId: string }) {
       setOpenId(d.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  // Phase 12: X-ray — auto-generate a starter dashboard from the cube.
+  const autoGenerate = async () => {
+    setGenerating(true);
+    setError(null);
+    try {
+      const r = await client.xrayDashboard(projectId, "Starter dashboard");
+      refresh();
+      setOpenId(r.dashboard_id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -77,6 +94,9 @@ export function DashboardsView({ projectId }: { projectId: string }) {
         </label>
         <button onClick={create} disabled={!name.trim()} className="text-[12px] px-4 py-2 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90 disabled:opacity-50">
           Create
+        </button>
+        <button onClick={autoGenerate} disabled={generating} className="text-[12px] px-4 py-2 rounded border border-accent/50 text-accent-glow hover:bg-accent/15 disabled:opacity-50" title="Auto-generate a starter dashboard from your cube (X-ray)">
+          {generating ? "Generating…" : "✨ Auto-generate"}
         </button>
       </div>
 

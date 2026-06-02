@@ -61,15 +61,25 @@ export function OnboardingView({
     }).catch(() => setModels([]));
   }, [client]);
 
+  // Resume-on-reload (Tier B): remember the in-flight session per dataset so a
+  // page refresh continues the interview instead of restarting it.
+  const storageKey = `insnav.ingest.${datasetId}`;
+
   useEffect(() => {
     if (started.current) return;
     started.current = true;
     setBusy(true);
-    client
-      .startIngestSession(datasetId)
+    const stored = (() => {
+      try { return window.localStorage.getItem(storageKey); } catch { return null; }
+    })();
+    const resumeOrStart = stored
+      ? client.getIngestSession(stored).catch(() => client.startIngestSession(datasetId))
+      : client.startIngestSession(datasetId);
+    resumeOrStart
       .then((r) => apply(r))
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, datasetId]);
 
   const apply = (r: { session: IngestSession; agent_message: AgentQuestion | null; completion: CompletionResult | null }) => {
@@ -78,6 +88,12 @@ export function OnboardingView({
     setCompletion(r.completion);
     if (r.agent_message?.question_type === "draft_review") {
       setDraft(r.agent_message.draft.map((d) => ({ ...d })));
+    }
+    try {
+      if (r.completion) window.localStorage.removeItem(storageKey);
+      else if (r.session?.id) window.localStorage.setItem(storageKey, r.session.id);
+    } catch {
+      /* localStorage unavailable — resume simply won't persist */
     }
   };
 

@@ -97,10 +97,46 @@ class TestForecast:
         assert r["confidence"] == 0.0
 
 
+class TestRegression:
+    def test_perfect_line(self):
+        r = stats.linear_regression([1, 2, 3, 4, 5], [2, 4, 6, 8, 10])
+        assert r["result"]["slope"] == pytest.approx(2.0, abs=1e-6)
+        assert r["result"]["r_squared"] == pytest.approx(1.0, abs=1e-6)
+
+    def test_too_few_points(self):
+        r = stats.linear_regression([1, 2], [2, 4])
+        assert r["confidence"] == 0.0
+
+
+class TestDiffInDifferences:
+    def test_basic_2x2(self):
+        # treated rose 30, control rose 10 → DiD = 20
+        r = stats.diff_in_differences(pre_treatment=[100], post_treatment=[130],
+                                      pre_control=[50], post_control=[60])
+        assert r["result"]["did_estimate"] == pytest.approx(20.0)
+        assert r["result"]["treatment_change"] == pytest.approx(30.0)
+
+    def test_accepts_lists_and_averages(self):
+        r = stats.diff_in_differences(pre_treatment=[10, 20], post_treatment=[40, 40],
+                                      pre_control=[10, 10], post_control=[10, 10])
+        # treated mean 15→40 (Δ25), control 10→10 (Δ0) → DiD 25
+        assert r["result"]["did_estimate"] == pytest.approx(25.0)
+
+    def test_missing_cell_is_graceful(self):
+        r = stats.diff_in_differences(pre_treatment=[], post_treatment=[1],
+                                      pre_control=[1], post_control=[1])
+        assert r["confidence"] == 0.0
+
+
 class TestDispatch:
     def test_run_analysis_routes(self):
         r = stats.run_analysis("summary", values=[1, 2, 3, 4, 5])
         assert r["method_used"] == "summary_stats"
+
+    def test_regression_and_did_registered(self):
+        assert stats.run_analysis("regression", x=[1, 2, 3], y=[1, 2, 3])["method_used"] == "ols_regression"
+        assert stats.run_analysis("did", pre_treatment=[1], post_treatment=[2],
+                                  pre_control=[1], post_control=[1])["method_used"] == "diff_in_differences"
 
     def test_unknown_method(self):
         r = stats.run_analysis("teleport", values=[1, 2, 3])
