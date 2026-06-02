@@ -14,13 +14,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from insnav_agents.schemas import Interpretation
-from insnav_agents.swarm import _rows_from_cube, build_catalog, to_cube_query
-from insnav_cube_client import CubeQueryClient
-
 from services.api_gateway.app.auth import Principal, current_principal
 from services.api_gateway.app.chat_router import _catalog_and_health
-from services.api_gateway.app.settings import get_settings
 
 router = APIRouter(prefix="/v1/pivot", tags=["pivot"])
 
@@ -96,35 +91,20 @@ def pivot_query(
     if not req.measures and not req.dimensions and not req.time_dimension:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "select at least one field")
 
-    schemas, _ = _catalog_and_health(principal.tenant_id, [], req.project_id)
-    _, valid = build_catalog(schemas)
+    from services.api_gateway.app.cube_query_service import UnknownField, run_spec
 
-    requested = list(req.measures) + list(req.dimensions)
-    if req.time_dimension:
-        requested.append(req.time_dimension)
-    requested += [f.get("member") for f in req.filters if isinstance(f, dict) and f.get("member")]
-    for name in requested:
-        if name not in valid:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"unknown field: {name}")
-
-    interp = Interpretation(
-        measures=req.measures,
-        dimensions=req.dimensions,
-        time_dimension=req.time_dimension,
-        granularity=req.granularity,
-        filters=req.filters,
-        order=req.order,
-        limit=req.limit or 5000,
-    )
-    query = to_cube_query(interp)
-
-    settings = get_settings()
-    cube = CubeQueryClient(
-        api_url=settings.cube_api_url,
-        api_secret=settings.cube_api_secret,
-        offline=settings.offline_mode or not settings.cube_api_url,
-        project_id=req.project_id,
-    )
-    result = cube.load(query, tenant_id=principal.tenant_id)
-    columns, rows = _rows_from_cube(result, query)
+    try:
+        columns, rows, query = run_spec(
+            tenant_id=principal.tenant_id,
+            project_id=req.project_id,
+            measures=req.measures,
+            dimensions=req.dimensions,
+            time_dimension=req.time_dimension,
+            granularity=req.granularity,
+            filters=req.filters,
+            order=req.order,
+            limit=req.limit,
+        )
+    except UnknownField as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     return PivotResult(columns=columns, rows=rows, cube_query=query)

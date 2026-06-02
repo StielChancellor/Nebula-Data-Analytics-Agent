@@ -18,6 +18,8 @@ import { ChatView } from "./views/ChatView";
 import { ProjectsView } from "./views/ProjectsView";
 import { OnboardingView } from "./views/OnboardingView";
 import { PivotView } from "./views/PivotView";
+import { DashboardsView } from "./views/DashboardsView";
+import { PublicDashboard } from "./views/PublicDashboard";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
@@ -29,6 +31,10 @@ type Surface = "admin" | "explore";
 
 export function App({ brand }: AppProps) {
   const auth = useAuth();
+  // Public read-only dashboard share link (?share=<token>) — no auth required.
+  const shareToken = new URLSearchParams(window.location.search).get("share");
+  if (shareToken) return <PublicDashboard token={shareToken} brand={brand} />;
+
   if (auth.status === "loading") return <BootSplash />;
   if (auth.status !== "authenticated" || !auth.principal)
     return <LoginScreen brandName={brand.displayName} brandLogoUrl={brand.logoUrl} />;
@@ -395,7 +401,7 @@ function ExploreSurface({ project }: { project: Project | null }) {
       </div>
       {tab === "ask" && <ChatView projectId={project.id} />}
       {tab === "pivots" && <PivotView projectId={project.id} />}
-      {tab === "dashboards" && <ComingSoon label="Dashboards" />}
+      {tab === "dashboards" && <DashboardsView projectId={project.id} />}
     </div>
   );
 }

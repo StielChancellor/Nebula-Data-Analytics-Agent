@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     fs_ingest_sessions_collection: str = Field(
         default="ingest_sessions", alias="INSNAV_FS_INGEST_SESSIONS_COLLECTION"
     )
+    # Firestore collection for pinnable dashboards (Phase 8).
+    fs_dashboards_collection: str = Field(
+        default="dashboards", alias="INSNAV_FS_DASHBOARDS_COLLECTION"
+    )
 
     # --- Cube (Phase 5b) ---
     # Where generated Cube .js schemas are written for the Cube container to read.

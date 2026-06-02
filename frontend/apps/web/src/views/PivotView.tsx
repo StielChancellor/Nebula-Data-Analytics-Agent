@@ -6,9 +6,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiClient,
+  type Dashboard,
   type PivotField,
   type PivotFields,
   type PivotResult,
+  type TileSpec,
 } from "@insnav/api-client";
 import { useAuth } from "@insnav/auth";
 
@@ -123,6 +125,17 @@ export function PivotView({ projectId }: { projectId: string }) {
           <div className="flex items-center justify-between">
             <div className="text-[11px] text-ink-300">{busy ? "Computing…" : grid ? `${grid.body.length} rows` : ""}</div>
             <div className="flex items-center gap-2">
+              {grid && (
+                <PinToDashboard
+                  client={client}
+                  projectId={projectId}
+                  spec={{ measures: values, dimensions: [...rows, ...cols], chart_type: "auto" }}
+                  title={
+                    `${values.map(short).join(", ") || "count"}` +
+                    (rows.length || cols.length ? ` by ${[...rows, ...cols].map(short).join(", ")}` : "")
+                  }
+                />
+              )}
               {grid && (
                 <button
                   onClick={() => copyTsv(grid)}
@@ -377,4 +390,93 @@ function copyTsv(grid: Grid) {
   const lines = [grid.flatHeader.join("\t")];
   for (const r of grid.body) lines.push([...r.rowKey, ...r.cells.map((c) => (c ?? "")).map(String)].join("\t"));
   void navigator.clipboard.writeText(lines.join("\n"));
+}
+
+function PinToDashboard({
+  client,
+  projectId,
+  spec,
+  title,
+}: {
+  client: ApiClient;
+  projectId: string;
+  spec: TileSpec;
+  title: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [dashboards, setDashboards] = useState<Dashboard[]>([]);
+  const [newName, setNewName] = useState("");
+  const [done, setDone] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const toggle = () => {
+    if (!open) client.listDashboards(projectId).then(setDashboards).catch(() => setDashboards([]));
+    setOpen((o) => !o);
+    setDone(null);
+  };
+
+  const pin = async (dashboardId: string) => {
+    setBusy(true);
+    try {
+      await client.addTile(dashboardId, title || "Tile", spec);
+      setDone("Pinned ✓");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pinNew = async () => {
+    if (!newName.trim()) return;
+    setBusy(true);
+    try {
+      const d = await client.createDashboard(projectId, newName.trim());
+      await client.addTile(d.id, title || "Tile", spec);
+      setNewName("");
+      setDone("Pinned to new dashboard ✓");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={toggle}
+        className="text-[11px] px-2 py-1 rounded bg-accent/15 text-accent-glow hover:bg-accent/25"
+      >
+        Pin to dashboard
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 z-20 w-60 border border-ink-700/60 rounded-lg bg-ink-800 p-2 space-y-1 shadow-xl">
+          {done ? (
+            <div className="text-[11px] text-emerald-300 px-1 py-1">{done}</div>
+          ) : (
+            <>
+              {dashboards.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => pin(d.id)}
+                  disabled={busy}
+                  className="block w-full text-left text-[12px] px-2 py-1 rounded hover:bg-ink-700/50 text-ink-100"
+                >
+                  {d.name}
+                </button>
+              ))}
+              {dashboards.length === 0 && <div className="text-[11px] text-ink-300 px-1">No dashboards yet.</div>}
+              <div className="flex items-center gap-1 pt-1 border-t border-ink-700/40">
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void pinNew()}
+                  placeholder="New dashboard…"
+                  className="flex-1 bg-ink-900 border border-ink-700/60 rounded px-2 py-1 text-[12px] text-ink-100"
+                />
+                <button onClick={pinNew} disabled={busy || !newName.trim()} className="text-[11px] px-2 py-1 rounded bg-accent text-accent-foreground disabled:opacity-50">+</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

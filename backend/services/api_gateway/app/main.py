@@ -29,6 +29,7 @@ from services.api_gateway.app.auth import (
 )
 from services.api_gateway.app.chat_router import router as chat_router
 from services.api_gateway.app.cube_router import router as cube_router
+from services.api_gateway.app.dashboards_router import router as dashboards_router
 from services.api_gateway.app.datasets_router import router as datasets_router
 from services.api_gateway.app.edges_router import router as edges_router
 from services.api_gateway.app.ingest_router import router as ingest_router
@@ -143,3 +144,4 @@ app.include_router(chat_router)
 app.include_router(projects_router)
 app.include_router(ingest_router)
 app.include_router(pivot_router)
+app.include_router(dashboards_router)

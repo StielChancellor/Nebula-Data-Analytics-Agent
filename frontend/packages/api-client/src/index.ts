@@ -214,6 +214,32 @@ export class ApiClient {
     return this.post("/v1/pivot/query", req);
   }
 
+  // --- Dashboards (Phase 8) ---
+  listDashboards(projectId: string): Promise<Dashboard[]> {
+    return this.get(`/v1/dashboards?project_id=${encodeURIComponent(projectId)}`);
+  }
+  createDashboard(projectId: string, name: string): Promise<Dashboard> {
+    return this.post("/v1/dashboards", { project_id: projectId, name });
+  }
+  getDashboard(id: string): Promise<Dashboard> {
+    return this.get(`/v1/dashboards/${id}`);
+  }
+  addTile(dashboardId: string, title: string, spec: TileSpec): Promise<Dashboard> {
+    return this.post(`/v1/dashboards/${dashboardId}/tiles`, { title, spec });
+  }
+  removeTile(dashboardId: string, tileId: string): Promise<Dashboard> {
+    return this.del(`/v1/dashboards/${dashboardId}/tiles/${tileId}`) as Promise<Dashboard>;
+  }
+  runDashboard(id: string): Promise<DashboardRun> {
+    return this.post(`/v1/dashboards/${id}/run`, {});
+  }
+  shareDashboard(id: string): Promise<Dashboard> {
+    return this.post(`/v1/dashboards/${id}/share`, {});
+  }
+  deleteDashboard(id: string): Promise<void> {
+    return this.del(`/v1/dashboards/${id}`).then(() => undefined);
+  }
+
   // --- Agent-led onboarding (Phase 10) ---
   startIngestSession(datasetId: string, llm?: string): Promise<SessionResponse> {
     return this.post("/v1/ingest/sessions", { dataset_id: datasetId, llm });
@@ -600,4 +626,51 @@ export interface PivotResult {
   columns: string[];
   rows: unknown[][];
   cube_query: Record<string, unknown>;
+}
+
+// ===================== Phase 8: Dashboards =====================
+
+export interface TileSpec {
+  measures?: string[];
+  dimensions?: string[];
+  time_dimension?: string | null;
+  granularity?: string | null;
+  filters?: Array<{ member: string; operator: string; values: string[] }>;
+  order?: Record<string, "asc" | "desc">;
+  limit?: number | null;
+  chart_type?: string;
+}
+
+export interface Tile {
+  id: string;
+  title: string;
+  spec: TileSpec;
+}
+
+export interface Dashboard {
+  id: string;
+  tenant_id: string;
+  project_id: string;
+  name: string;
+  created_by: string;
+  tiles: Tile[];
+  share_token: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TileResult {
+  tile_id: string;
+  title: string;
+  spec: TileSpec;
+  columns: string[];
+  rows: unknown[][];
+  chart_type: string;
+  error: string | null;
+}
+
+export interface DashboardRun {
+  dashboard_id: string;
+  name: string;
+  tiles: TileResult[];
 }

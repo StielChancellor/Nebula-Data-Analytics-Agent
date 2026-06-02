@@ -16,12 +16,11 @@ def _reset_all_offline_stores() -> None:
     """Wipe every in-memory store so tests are isolated (Phase 10 added more)."""
     datasets.reset_offline_store()
     projects.reset_offline_store()
-    try:
-        from services.api_gateway.app import ingest_router
-
-        ingest_router.reset_offline_store()
-    except Exception:  # noqa: BLE001
-        pass
+    for mod in ("ingest_router", "dashboards"):
+        try:
+            __import__(f"services.api_gateway.app.{mod}", fromlist=["reset_offline_store"]).reset_offline_store()
+        except Exception:  # noqa: BLE001
+            pass
     # Cross-package stores (edges, cube model) — reset if importable.
     try:
         import insnav_graph_store
