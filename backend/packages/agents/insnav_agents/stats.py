@@ -212,6 +212,91 @@ def forecast(series: list[float], *, periods: int = 3) -> dict[str, Any]:
                      assumptions=["series is roughly evenly spaced in time"], caveats=caveats)
 
 
+# ---------- regression ----------
+
+def linear_regression(x: list[float], y: list[float]) -> dict[str, Any]:
+    """OLS slope/intercept + R² (and p-value if scipy is present)."""
+    try:
+        np = _np()
+    except Exception:
+        return _unavailable("ols_regression")
+    xa = np.asarray([v for v in x if v is not None], dtype=float)
+    ya = np.asarray([v for v in y if v is not None], dtype=float)
+    n = int(min(xa.size, ya.size))
+    if n < 3:
+        return _envelope("ols_regression", {}, confidence=0.0, caveats=["need >= 3 paired points"])
+    xa, ya = xa[:n], ya[:n]
+    pval: float | None = None
+    stderr: float | None = None
+    try:
+        from scipy import stats as sstats
+
+        lr = sstats.linregress(xa, ya)
+        slope, intercept, rval = float(lr.slope), float(lr.intercept), float(lr.rvalue)
+        pval, stderr = float(lr.pvalue), float(lr.stderr)
+    except Exception:  # noqa: BLE001 — scipy missing → numpy fallback (no p-value)
+        slope, intercept = (float(v) for v in np.polyfit(xa, ya, 1))
+        yhat = slope * xa + intercept
+        ss_res = float(np.sum((ya - yhat) ** 2))
+        ss_tot = float(np.sum((ya - np.mean(ya)) ** 2))
+        rval = math.sqrt(max(0.0, 1.0 - ss_res / ss_tot)) if ss_tot else 0.0
+    r2 = float(rval ** 2)
+    caveats: list[str] = []
+    if n < SMALL_SAMPLE:
+        caveats.append(f"small sample (n={n})")
+    if pval is not None and pval >= ALPHA:
+        caveats.append(f"slope not statistically significant (p={round(pval, 4)})")
+    res = {
+        "slope": round(float(slope), 6), "intercept": round(float(intercept), 6),
+        "r_squared": round(r2, 4), "n": n,
+        "p_value": (round(pval, 6) if pval is not None else None),
+        "std_error": (round(stderr, 6) if stderr is not None else None),
+        "significant": (bool(pval < ALPHA) if pval is not None else None),
+    }
+    return _envelope("ols_regression", res, confidence=r2,
+                     assumptions=["linear relationship", "homoscedastic residuals (unchecked)"],
+                     caveats=caveats)
+
+
+# ---------- difference-in-differences (causal, 2x2) ----------
+
+def diff_in_differences(
+    pre_treatment: Any, post_treatment: Any, pre_control: Any, post_control: Any
+) -> dict[str, Any]:
+    """Canonical 2x2 DiD: (Δ treated) − (Δ control). Each cell is a value or list."""
+    try:
+        np = _np()
+    except Exception:
+        return _unavailable("diff_in_differences")
+
+    def mean(v: Any) -> float:
+        seq = v if isinstance(v, (list, tuple)) else [v]
+        a = np.asarray([x for x in seq if x is not None], dtype=float)
+        return float(np.mean(a)) if a.size else float("nan")
+
+    pt, qt, pc, qc = mean(pre_treatment), mean(post_treatment), mean(pre_control), mean(post_control)
+    if any(math.isnan(v) for v in (pt, qt, pc, qc)):
+        return _envelope("diff_in_differences", {}, confidence=0.0,
+                         caveats=["all four cells (pre/post × treatment/control) need data"])
+    treat_change = qt - pt
+    control_change = qc - pc
+    did = treat_change - control_change
+    res = {
+        "did_estimate": round(did, 6),
+        "treatment_change": round(treat_change, 6),
+        "control_change": round(control_change, 6),
+        "means": {
+            "pre_treatment": round(pt, 6), "post_treatment": round(qt, 6),
+            "pre_control": round(pc, 6), "post_control": round(qc, 6),
+        },
+    }
+    return _envelope("diff_in_differences", res, confidence=0.5,
+                     assumptions=["parallel trends absent treatment (untestable here)",
+                                  "no spillover between groups"],
+                     caveats=["point estimate only — no standard error / inference",
+                              "valid only with a credible control group"])
+
+
 # ---------- dispatch (the LLM picks a method name + params) ----------
 
 METHODS = {
@@ -220,6 +305,9 @@ METHODS = {
     "correlation": correlation,
     "anomaly": detect_anomalies,
     "forecast": forecast,
+    "regression": linear_regression,
+    "diff_in_differences": diff_in_differences,
+    "did": diff_in_differences,
 }
 
 

@@ -90,6 +90,34 @@ class TestStartUpload:
         assert rows[0]["locale_hint"] == "IN"
         assert rows[0]["label"] == "sales.csv"
 
+    def test_upload_into_project_associates_and_inherits_locale(self, client: TestClient) -> None:
+        h = _auth_headers(client)
+        pid = client.post(
+            "/v1/projects", headers=h, json={"name": "Marriott", "locale_default": "IN"}
+        ).json()["id"]
+        start = client.post(
+            "/v1/uploads/start",
+            headers=h,
+            json={"filename": "txns.csv", "size_bytes": 1000, "project_id": pid},
+        )
+        assert start.status_code == 200, start.text
+        ds_id = start.json()["dataset_id"]
+        # dataset carries project_id + inherited IN locale (no explicit locale_hint given)
+        ds = client.get(f"/v1/datasets/{ds_id}", headers=h).json()
+        assert ds["project_id"] == pid
+        assert ds["locale_hint"] == "IN"
+        # project now lists the dataset
+        proj = client.get(f"/v1/projects/{pid}", headers=h).json()
+        assert ds_id in proj["dataset_ids"]
+
+    def test_upload_into_unknown_project_404s(self, client: TestClient) -> None:
+        r = client.post(
+            "/v1/uploads/start",
+            headers=_auth_headers(client),
+            json={"filename": "x.csv", "size_bytes": 10, "project_id": "nope"},
+        )
+        assert r.status_code == 404
+
 
 class TestCompleteUpload:
     def test_runs_load_then_profile_then_marks_ready(self, client: TestClient) -> None:
@@ -165,3 +193,89 @@ class TestDatasetDetail:
             headers=_auth_headers(client),
         )
         assert r.status_code == 404
+
+
+class TestRobustIngestion:
+    def test_preview_returns_inferred_schema(self, client: TestClient) -> None:
+        h = _auth_headers(client)
+        ds_id = client.post(
+            "/v1/uploads/start", headers=h, json={"filename": "f.csv", "size_bytes": 100}
+        ).json()["dataset_id"]
+        r = client.post("/v1/uploads/preview", headers=h, json={"dataset_id": ds_id})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        names = {c["name"]: c["inferred_bq_type"] for c in body["columns"]}
+        # offline synthetic sample is "city,revenue\nMumbai,125\nPune,50"
+        assert names == {"city": "STRING", "revenue": "INT64"}
+
+    def test_preview_persisted_without_nested_arrays(self, client: TestClient) -> None:
+        # Firestore rejects nested arrays; row_sample (list-of-lists) must be
+        # dropped from the STORED preview but kept in the response. (Live-only bug.)
+        h = _auth_headers(client)
+        ds_id = client.post(
+            "/v1/uploads/start", headers=h, json={"filename": "f.csv", "size_bytes": 100}
+        ).json()["dataset_id"]
+        resp = client.post("/v1/uploads/preview", headers=h, json={"dataset_id": ds_id}).json()
+        assert "row_sample" in resp  # response keeps it for the UI
+        stored = client.get(f"/v1/datasets/{ds_id}", headers=h).json()["preview"]
+        assert stored is not None
+        assert "row_sample" not in stored  # persisted copy drops the nested array
+        assert "columns" in stored
+
+    def test_complete_with_overrides_threads_schema(self, client: TestClient) -> None:
+        h = _auth_headers(client)
+        ds_id = client.post(
+            "/v1/uploads/start", headers=h, json={"filename": "f.csv", "size_bytes": 100}
+        ).json()["dataset_id"]
+        overrides = [
+            {"name": "txn_date", "bq_type": "DATE", "source_format": "DD-MM-YYYY"},
+            {"name": "amount", "bq_type": "NUMERIC", "source_format": "INR_GROUPED"},
+            {"name": "city", "bq_type": "STRING"},
+        ]
+        r = client.post(
+            "/v1/uploads/complete",
+            headers=h,
+            json={"dataset_id": ds_id, "schema_overrides": overrides},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["column_count"] == 3  # offline echoes the override columns
+
+    def test_failure_records_structured_error(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from services.api_gateway.app import uploads
+
+        def boom(*a, **k):
+            raise RuntimeError("Could not parse '13/13/2024' as DATE")
+
+        monkeypatch.setattr(uploads, "_load_csv_to_bq", boom)
+        h = _auth_headers(client)
+        ds_id = client.post(
+            "/v1/uploads/start", headers=h, json={"filename": "f.csv", "size_bytes": 100}
+        ).json()["dataset_id"]
+        r = client.post("/v1/uploads/complete", headers=h, json={"dataset_id": ds_id})
+        assert r.status_code == 500
+        ds = client.get(f"/v1/datasets/{ds_id}", headers=h).json()
+        assert ds["status"] == "failed"
+        assert ds["error_detail"]["stage"] == "load"
+        assert ds["error_detail"]["reason"] == "schema_type_mismatch"
+        assert ds["error_detail"]["hint"]
+        assert ds["error"] == ds["error_detail"]["message"]
+
+
+class TestNormalizeSql:
+    def test_india_date_and_currency(self) -> None:
+        from services.api_gateway.app.datasets import ColumnSpec
+        from services.api_gateway.app.uploads import build_normalize_sql
+
+        specs = [
+            ColumnSpec(name="txn_date", bq_type="DATE", source_format="DD-MM-YYYY"),
+            ColumnSpec(name="amount", bq_type="NUMERIC", source_format="INR_GROUPED"),
+            ColumnSpec(name="city", bq_type="STRING", source_format=None),
+        ]
+        sql = build_normalize_sql("proj.raw.t", specs)
+        assert "SAFE.PARSE_DATE('%d-%m-%Y', `txn_date`)" in sql
+        assert "REGEXP_REPLACE(`amount`" in sql
+        assert "SAFE_CAST(" in sql and "AS NUMERIC)" in sql
+        assert "`city` AS `city`" in sql  # untouched passthrough
+        assert sql.startswith("CREATE OR REPLACE TABLE `proj.raw.t` AS")

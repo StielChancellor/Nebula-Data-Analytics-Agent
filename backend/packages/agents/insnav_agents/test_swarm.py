@@ -239,3 +239,45 @@ class TestAnswerQuestion:
             router=LLMRouter(_Garbage()), cube_client=_offline_cube(),
         )
         assert ans.kind == "clarify"
+
+
+class TestCausalGuardrail:
+    def test_detects_causal_claim(self):
+        from insnav_agents.swarm import detect_causal_request
+
+        is_causal, has_strategy = detect_causal_request("Did the price cut cause the revenue jump?")
+        assert is_causal and not has_strategy
+
+    def test_plain_why_is_not_trapped(self):
+        from insnav_agents.swarm import detect_causal_request
+
+        # "why did X drop" is diagnostic/decomposition, not a causal CLAIM.
+        is_causal, _ = detect_causal_request("why did revenue drop in May")
+        assert is_causal is False
+
+    def test_strategy_stated_is_recognized(self):
+        from insnav_agents.swarm import detect_causal_request
+
+        is_causal, has_strategy = detect_causal_request(
+            "Estimate the effect of the campaign using a difference-in-differences design")
+        assert is_causal and has_strategy
+
+    @pytest.mark.asyncio
+    async def test_causal_without_strategy_refuses(self):
+        ans = await answer_question(
+            "Did the discount cause higher revenue?", tenant_id="t1",
+            schemas=[_schema()], dataset_health=_health(),
+            router=_router(_good_interp()), cube_client=_offline_cube(),
+        )
+        assert ans.kind == "refuse"
+        assert "identification strategy" in " ".join(ans.caveats).lower()
+
+    @pytest.mark.asyncio
+    async def test_causal_with_strategy_proceeds_with_caveat(self):
+        ans = await answer_question(
+            "Effect of the discount on revenue by city via difference-in-differences",
+            tenant_id="t1", schemas=[_schema()], dataset_health=_health(),
+            router=_router(_good_interp()), cube_client=_offline_cube(),
+        )
+        assert ans.kind == "answer"
+        assert any("identification strategy stated" in c.lower() for c in ans.caveats)

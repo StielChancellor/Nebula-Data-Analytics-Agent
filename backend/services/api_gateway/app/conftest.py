@@ -9,17 +9,41 @@ from __future__ import annotations
 
 import pytest
 
-from services.api_gateway.app import datasets, settings
+from services.api_gateway.app import datasets, projects, settings
+
+
+def _reset_all_offline_stores() -> None:
+    """Wipe every in-memory store so tests are isolated (Phase 10 added more)."""
+    datasets.reset_offline_store()
+    projects.reset_offline_store()
+    for mod in ("ingest_router", "dashboards", "cohorts", "snapshots"):
+        try:
+            __import__(f"services.api_gateway.app.{mod}", fromlist=["reset_offline_store"]).reset_offline_store()
+        except Exception:  # noqa: BLE001
+            pass
+    # Cross-package stores (edges, cube model) — reset if importable.
+    try:
+        import insnav_graph_store
+
+        insnav_graph_store.reset_offline_store()
+    except Exception:  # noqa: BLE001 — package not on path in some unit suites
+        pass
+    try:
+        from insnav_cube_client import sync as _cube_sync
+
+        _cube_sync.reset_offline_model()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 @pytest.fixture(autouse=True)
 def offline_env(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("INSNAV_OFFLINE", "true")
     settings.get_settings.cache_clear()
-    datasets.reset_offline_store()
+    _reset_all_offline_stores()
     yield
     settings.get_settings.cache_clear()
-    datasets.reset_offline_store()
+    _reset_all_offline_stores()
 
 
 @pytest.fixture

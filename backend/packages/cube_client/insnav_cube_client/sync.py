@@ -33,9 +33,13 @@ def reset_offline_model() -> None:
     _OFFLINE_MODEL.clear()
 
 
-def read_offline_model(tenant_id: str) -> dict[str, Any]:
+def _model_key(tenant_id: str, project_id: str | None) -> str:
+    return tenant_id if project_id is None else f"{tenant_id}/{project_id}"
+
+
+def read_offline_model(tenant_id: str, project_id: str | None = None) -> dict[str, Any]:
     """Test/inspection helper. Returns {"files": {...}, "version": str} or {}."""
-    return _OFFLINE_MODEL.get(tenant_id, {})
+    return _OFFLINE_MODEL.get(_model_key(tenant_id, project_id), {})
 
 
 # ---------- rendering ----------
@@ -65,6 +69,7 @@ def model_version(files: dict[str, str]) -> str:
 def sync_cube_model(
     *,
     tenant_id: str,
+    project_id: str | None = None,
     datasets: list[dict[str, Any]],
     columns_by_dataset: dict[str, list[dict[str, Any]]],
     edges: list[dict[str, Any]],
@@ -73,11 +78,10 @@ def sync_cube_model(
     offline: bool = False,
 ) -> dict[str, Any]:
     """
-    Build + write this tenant's full Cube model. Returns
-    {"version": str, "file_count": int, "cube_names": [...]}.
-
-    Idempotent: identical inputs produce identical files + version, so
-    re-running is cheap and safe.
+    Build + write a Cube model. Scoped per project (Phase 10): models land at
+    `<prefix>/<tenant>/<project>/`. project_id=None keeps the legacy
+    `<prefix>/<tenant>/` path for back-compat. Returns
+    {"version", "file_count", "cube_names"}. Idempotent.
     """
     schemas = build_tenant_schemas(
         datasets=datasets, columns_by_dataset=columns_by_dataset, edges=edges
@@ -86,10 +90,13 @@ def sync_cube_model(
     version = model_version(files)
 
     if offline:
-        _OFFLINE_MODEL[tenant_id] = {"files": dict(files), "version": version}
+        _OFFLINE_MODEL[_model_key(tenant_id, project_id)] = {"files": dict(files), "version": version}
         return _result(version, files, schemas)
 
-    _write_to_gcs(bucket=bucket, prefix=prefix, tenant_id=tenant_id, files=files, version=version)
+    _write_to_gcs(
+        bucket=bucket, prefix=prefix, tenant_id=tenant_id,
+        project_id=project_id, files=files, version=version,
+    )
     return _result(version, files, schemas)
 
 
@@ -101,7 +108,10 @@ def _result(version: str, files: dict[str, str], schemas: list[CubeSchema]) -> d
     }
 
 
-def _write_to_gcs(*, bucket: str, prefix: str, tenant_id: str, files: dict[str, str], version: str) -> None:
+def _write_to_gcs(
+    *, bucket: str, prefix: str, tenant_id: str, project_id: str | None,
+    files: dict[str, str], version: str,
+) -> None:
     """
     Write each model file + the version marker. Deletes stale .js files that
     are no longer part of the model (e.g. a dataset was removed) so the Cube
@@ -111,7 +121,7 @@ def _write_to_gcs(*, bucket: str, prefix: str, tenant_id: str, files: dict[str, 
 
     client = storage.Client()
     gcs_bucket = client.bucket(bucket)
-    base = f"{prefix}/{tenant_id}"
+    base = f"{prefix}/{tenant_id}" if project_id is None else f"{prefix}/{tenant_id}/{project_id}"
 
     # 1) Write current files.
     desired_blob_names = set()

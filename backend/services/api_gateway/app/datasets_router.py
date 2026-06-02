@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from services.api_gateway.app.auth import Principal, current_principal
+from services.api_gateway.app.auth import Principal, current_principal, require_admin
 from services.api_gateway.app.datasets import (
     Dataset,
     get_dataset as fs_get_dataset,
@@ -22,8 +22,20 @@ from services.api_gateway.app.datasets import (
 router = APIRouter(tags=["datasets"])
 
 
+class DeleteDatasetResponse(BaseModel):
+    dataset_id: str
+    deleted: bool
+    # What was cleaned up, for transparency in the UI.
+    edges: int = 0
+    bq_table: bool = False
+    gcs_blob: bool = False
+    firestore: bool = False
+    cube_resynced: bool = False
+
+
 class DatasetListItem(BaseModel):
     id: str
+    project_id: str | None = None
     label: str
     locale_hint: Literal["US", "IN"]
     status: str
@@ -36,11 +48,15 @@ class DatasetListItem(BaseModel):
 @router.get("/v1/me/datasets", response_model=list[DatasetListItem])
 def list_my_datasets(
     principal: Annotated[Principal, Depends(current_principal)],
+    project_id: str | None = None,
 ) -> list[DatasetListItem]:
     items = list_datasets_for_tenant(principal.tenant_id)
+    if project_id is not None:
+        items = [d for d in items if d.project_id == project_id]
     return [
         DatasetListItem(
             id=d.id,
+            project_id=d.project_id,
             label=d.label,
             locale_hint=d.locale_hint,
             status=d.status,
@@ -64,3 +80,27 @@ def get_dataset(
         # Don't leak existence; same 404 as missing
         raise HTTPException(status.HTTP_404_NOT_FOUND, "dataset not found")
     return d
+
+
+@router.delete("/v1/datasets/{dataset_id}", response_model=DeleteDatasetResponse)
+def delete_dataset(
+    dataset_id: str,
+    principal: Annotated[Principal, Depends(require_admin)],  # SEC H1
+) -> DeleteDatasetResponse:
+    """
+    Fully delete a dataset: graph edges, BQ raw table, GCS blob, Firestore doc
+    + columns, project association, and re-publish the Cube model. Idempotent
+    and tenant-scoped (a missing/foreign dataset returns deleted=false).
+    """
+    from services.api_gateway.app.datasets_cleanup import delete_dataset_fully
+
+    summary = delete_dataset_fully(dataset_id, principal)
+    return DeleteDatasetResponse(
+        dataset_id=dataset_id,
+        deleted=bool(summary.get("deleted")),
+        edges=int(summary.get("edges", 0)),
+        bq_table=bool(summary.get("bq_table")),
+        gcs_blob=bool(summary.get("gcs_blob")),
+        firestore=bool(summary.get("firestore")),
+        cube_resynced=bool(summary.get("cube_resynced")),
+    )

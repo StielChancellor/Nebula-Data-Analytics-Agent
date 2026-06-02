@@ -47,10 +47,17 @@ pytest
 
 ## Architecture notes
 
-Agent swarm v1 lives entirely in `services/orchestrator/`, importing the 7
-agent modules from `packages/agents/` as in-process Python modules. The
-extraction boundary is the `insnav_contracts.envelope.AgentMessage` /
-`AgentResult` envelope — when an agent needs to scale independently we can
+**Agent swarm v1 runs in-process inside `services/api_gateway/`** — the
+`POST /v1/chat` handler calls `insnav_agents.swarm.answer_question`, which
+orchestrates the Semantic/Critic/Data-Quality/Stats agents as Python modules
+(per PRD D5). Likewise ingestion (uploads.py), edge discovery (edge_proposer.py),
+and onboarding (insnav_agents.onboarding) all run in-process in api_gateway.
+
+The `services/{orchestrator,graph_builder,ingestion,compute_sandbox}/` packages
+are **Phase-0 scaffolds that are NOT deployed** — they exist as extraction
+boundaries for when an agent/job needs to scale independently. Only
+`services/cube_gen/` (the Cube model rebuild job) and `services/api_gateway/`
+are real, deployed workloads. The extraction boundary is the agent envelope —
 swap function calls for HTTP calls without rewriting the agent itself.
 
 See `../PRD.md` for the full architecture, build order, and acceptance criteria.

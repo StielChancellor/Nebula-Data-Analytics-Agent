@@ -1,41 +1,46 @@
 /**
- * Phase 2 shell app.
+ * App shell (Phase 10) — two surfaces.
  *
- * Renders <LoginScreen/> when unauth'd. When auth'd: a tabbed shell with
- * "Locale demo" + "Datasets" — the latter is the real upload + list view
- * built in Phase 2.
+ *  • Admin   — projects live here. Open a project to manage its Datasets,
+ *              Onboarding, Graph, Cube, and Settings (its own workspace).
+ *  • Explore — consume a selected project: Ask (chat), Pivots, Dashboards.
+ *
+ * A project selector in the header sets the active workspace for both surfaces.
  */
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BrandConfig } from "@insnav/brand-runtime";
 import { useAuth, LoginScreen } from "@insnav/auth";
-import {
-  formatCurrency,
-  formatCurrencyCompact,
-  formatNumber,
-  fyLabel,
-  fyQuarter,
-  type RegionCode,
-} from "@insnav/locale";
+import { ApiClient, type Project, type ProjectStatus } from "@insnav/api-client";
 import { DatasetsView } from "./views/DatasetsView";
 import { GraphView } from "./views/GraphView";
 import { CubeView } from "./views/CubeView";
 import { ChatView } from "./views/ChatView";
+import { ProjectsView } from "./views/ProjectsView";
+import { OnboardingView } from "./views/OnboardingView";
+import { PivotView } from "./views/PivotView";
+import { DashboardsView } from "./views/DashboardsView";
+import { PublicDashboard } from "./views/PublicDashboard";
+import { MetricsView } from "./views/MetricsView";
+import { CohortsView } from "./views/CohortsView";
+import { SnapshotsView } from "./views/SnapshotsView";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
 interface AppProps {
   brand: BrandConfig;
 }
 
-const DEMO_VALUE = 12_400_000;
-
-type Tab = "chat" | "datasets" | "graph" | "cube" | "demo";
+type Surface = "admin" | "explore";
 
 export function App({ brand }: AppProps) {
   const auth = useAuth();
+  // Public read-only dashboard share link (?share=<token>) — no auth required.
+  const shareToken = new URLSearchParams(window.location.search).get("share");
+  if (shareToken) return <PublicDashboard token={shareToken} brand={brand} />;
 
   if (auth.status === "loading") return <BootSplash />;
   if (auth.status !== "authenticated" || !auth.principal)
     return <LoginScreen brandName={brand.displayName} brandLogoUrl={brand.logoUrl} />;
-
   return <AuthedShell brand={brand} />;
 }
 
@@ -49,62 +54,110 @@ function BootSplash() {
 
 function AuthedShell({ brand }: { brand: BrandConfig }) {
   const auth = useAuth();
-  const [tab, setTab] = useState<Tab>("chat");
+  const client = useMemo(
+    () => new ApiClient({ baseUrl: API_BASE, getToken: auth.getToken }),
+    [auth.getToken],
+  );
+
+  const [surface, setSurface] = useState<Surface>("admin");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [project, setProject] = useState<Project | null>(null);
+
+  const loadProjects = () =>
+    client.listProjects().then(setProjects).catch(() => setProjects([]));
+  useEffect(() => {
+    void loadProjects();
+  }, [client]);
 
   return (
     <div className="min-h-screen bg-ink-900 text-ink-100">
-      <header className="border-b border-ink-700/60 px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-ink-700/60 px-6 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <img src={brand.logoUrl} alt="" className="h-8 w-8" />
           <div>
             <div className="text-sm font-semibold tracking-wide">{brand.displayName}</div>
             <div className="text-[11px] text-ink-300 font-mono">
-              brand: {brand.brandId} · tenant: {auth.principal?.tenant_id} · phase 2
+              {auth.principal?.tenant_id} · phase 10
             </div>
           </div>
         </div>
+
         <div className="flex items-center gap-3">
-          <Tabs tab={tab} setTab={setTab} />
+          <SurfaceToggle surface={surface} setSurface={setSurface} />
+          <ProjectSelector
+            projects={projects}
+            project={project}
+            onPick={(p) => {
+              setProject(p);
+              if (p && surface === "admin") setSurface("admin");
+            }}
+          />
           <AccountMenu />
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto p-6 space-y-6">
-        {tab === "chat" && <ChatView />}
-        {tab === "datasets" && <DatasetsView />}
-        {tab === "graph" && <GraphView />}
-        {tab === "cube" && <CubeView />}
-        {tab === "demo" && <LocaleDemoView brand={brand} />}
+      <main className="max-w-5xl mx-auto p-6">
+        {surface === "admin" ? (
+          project ? (
+            <ProjectWorkspace
+              project={project}
+              onBack={() => setProject(null)}
+            />
+          ) : (
+            <ProjectsView
+              onOpen={(p) => {
+                setProject(p);
+                void loadProjects();
+              }}
+            />
+          )
+        ) : (
+          <ExploreSurface project={project} />
+        )}
       </main>
     </div>
   );
 }
 
-function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
-  const tabs: Array<{ id: Tab; label: string }> = [
-    { id: "chat", label: "Ask" },
-    { id: "datasets", label: "Datasets" },
-    { id: "graph", label: "Graph" },
-    { id: "cube", label: "Cube" },
-    { id: "demo", label: "Locale demo" },
-  ];
+function SurfaceToggle({ surface, setSurface }: { surface: Surface; setSurface: (s: Surface) => void }) {
   return (
     <div className="flex items-center rounded-md border border-ink-700/60 overflow-hidden text-[12px]">
-      {tabs.map((t) => (
+      {(["admin", "explore"] as Surface[]).map((s) => (
         <button
-          key={t.id}
-          onClick={() => setTab(t.id)}
+          key={s}
+          onClick={() => setSurface(s)}
           className={[
-            "px-3 py-1.5 transition-colors",
-            tab === t.id
-              ? "bg-accent text-accent-foreground font-semibold"
-              : "bg-ink-800/40 text-ink-200 hover:bg-ink-700/60",
+            "px-3 py-1.5 capitalize transition-colors",
+            surface === s ? "bg-accent text-accent-foreground font-semibold" : "bg-ink-800/40 text-ink-200 hover:bg-ink-700/60",
           ].join(" ")}
         >
-          {t.label}
+          {s}
         </button>
       ))}
     </div>
+  );
+}
+
+function ProjectSelector({
+  projects,
+  project,
+  onPick,
+}: {
+  projects: Project[];
+  project: Project | null;
+  onPick: (p: Project | null) => void;
+}) {
+  return (
+    <select
+      value={project?.id ?? ""}
+      onChange={(e) => onPick(projects.find((p) => p.id === e.target.value) ?? null)}
+      className="bg-ink-900 border border-ink-700/60 rounded px-2 py-1.5 text-[12px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent max-w-[180px]"
+    >
+      <option value="">— Projects —</option>
+      {projects.map((p) => (
+        <option key={p.id} value={p.id}>{p.name}</option>
+      ))}
+    </select>
   );
 }
 
@@ -121,57 +174,241 @@ function AccountMenu() {
   );
 }
 
-function LocaleDemoView({ brand }: { brand: BrandConfig }) {
-  const [region, setRegion] = useState<RegionCode>(brand.regionDefault);
-  const today = new Date();
+// ---------- Admin: a single project's workspace ----------
+
+type WorkspaceTab = "datasets" | "onboarding" | "graph" | "cube" | "metrics" | "settings";
+
+function ProjectWorkspace({ project, onBack }: { project: Project; onBack: () => void }) {
+  const [tab, setTab] = useState<WorkspaceTab>("datasets");
+  const [onboardingDatasetId, setOnboardingDatasetId] = useState<string | null>(null);
+
+  const tabs: Array<{ id: WorkspaceTab; label: string }> = [
+    { id: "datasets", label: "Datasets" },
+    { id: "onboarding", label: "Onboarding" },
+    { id: "graph", label: "Graph" },
+    { id: "cube", label: "Cube" },
+    { id: "metrics", label: "Metrics" },
+    { id: "settings", label: "Settings" },
+  ];
+
+  const startOnboarding = (datasetId: string) => {
+    setOnboardingDatasetId(datasetId);
+    setTab("onboarding");
+  };
+
   return (
-    <div className="space-y-6">
-      <section>
-        <h1 className="text-2xl font-semibold">Locale demo</h1>
-        <p className="text-ink-300 mt-1">
-          Toggle the region to verify Lakh/Crore + en-IN grouping + Apr-Mar FY work end-to-end.
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[12px]">
+          <button onClick={onBack} className="text-ink-300 hover:text-ink-100">← Projects</button>
+          <span className="text-ink-500">/</span>
+          <span className="font-semibold">{project.name}</span>
+          <span className="text-[10px] uppercase tracking-wider text-ink-300 ml-1">{project.locale_default}</span>
+        </div>
+        <div className="flex items-center rounded-md border border-ink-700/60 overflow-hidden text-[12px]">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={[
+                "px-3 py-1.5 transition-colors",
+                tab === t.id ? "bg-accent text-accent-foreground font-semibold" : "bg-ink-800/40 text-ink-200 hover:bg-ink-700/60",
+              ].join(" ")}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "datasets" && (
+        <DatasetsView
+          projectId={project.id}
+          localeDefault={project.locale_default}
+          onOnboard={startOnboarding}
+        />
+      )}
+      {tab === "onboarding" && (
+        onboardingDatasetId ? (
+          <OnboardingView
+            datasetId={onboardingDatasetId}
+            onDone={() => {
+              setOnboardingDatasetId(null);
+              setTab("datasets");
+            }}
+          />
+        ) : (
+          <div className="text-[12px] text-ink-300 border border-ink-700/60 rounded-lg p-6 bg-ink-800/30">
+            Upload a CSV in <span className="text-ink-100">Datasets</span>, then click{" "}
+            <span className="text-accent-glow">Onboard</span> to start the agent-led interview.
+          </div>
+        )
+      )}
+      {tab === "graph" && <GraphView projectId={project.id} />}
+      {tab === "cube" && <CubeView projectId={project.id} />}
+      {tab === "metrics" && <MetricsView projectId={project.id} />}
+      {tab === "settings" && <ProjectSettings project={project} onChanged={onBack} />}
+    </div>
+  );
+}
+
+function ProjectSettings({ project, onChanged }: { project: Project; onChanged: () => void }) {
+  const auth = useAuth();
+  const client = useMemo(
+    () => new ApiClient({ baseUrl: API_BASE, getToken: auth.getToken }),
+    [auth.getToken],
+  );
+  const [name, setName] = useState(project.name);
+  const [status, setStatus] = useState<ProjectStatus>(project.status);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await client.updateProject(project.id, { name: name.trim(), status });
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (
+      !window.confirm(
+        `Delete project “${project.name}”? This permanently deletes its ${project.dataset_ids.length} dataset(s) — BigQuery tables, files, graph edges, and cube — and cannot be undone.`,
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      await client.deleteProject(project.id);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 text-[13px] max-w-lg">
+      <h3 className="text-sm font-semibold">Settings</h3>
+
+      {error && (
+        <div className="text-[12px] text-red-300 border border-red-900/60 bg-red-950/40 rounded px-2 py-1">
+          {error}
+        </div>
+      )}
+
+      <div className="border border-ink-700/60 rounded-lg bg-ink-800/40 p-4 space-y-3">
+        <label className="block text-[11px] text-ink-300">
+          Name
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mt-1 w-full bg-ink-900 border border-ink-700/60 rounded px-3 py-2 text-sm text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </label>
+        <label className="block text-[11px] text-ink-300">
+          Status
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as ProjectStatus)}
+            className="mt-1 block bg-ink-900 border border-ink-700/60 rounded px-2 py-2 text-[12px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="draft">draft</option>
+            <option value="active">active</option>
+            <option value="archived">archived</option>
+          </select>
+        </label>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={save}
+            disabled={busy || !name.trim()}
+            className="text-[12px] px-4 py-2 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {busy ? "Saving…" : "Save"}
+          </button>
+          {saved && <span className="text-[12px] text-emerald-300">Saved ✓</span>}
+        </div>
+      </div>
+
+      <dl className="border border-ink-700/60 rounded-lg bg-ink-800/40 divide-y divide-ink-700/40">
+        {[
+          ["Locale", project.locale_default],
+          ["Owner", project.owner_email],
+          ["Members", `${project.members.length}`],
+          ["Datasets", `${project.dataset_ids.length}`],
+        ].map(([k, v]) => (
+          <div key={k} className="flex justify-between px-4 py-2">
+            <dt className="text-ink-300">{k}</dt>
+            <dd className="text-ink-100 font-mono">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-[11px] text-ink-300">
+        Member invitations require user accounts (Identity Platform) — a later add.
+      </p>
+
+      <div className="border border-red-900/50 rounded-lg p-4">
+        <div className="text-[12px] text-red-300 font-semibold mb-1">Danger zone</div>
+        <p className="text-[11px] text-ink-300 mb-2">
+          Deleting a project removes all its datasets, graph, and cube. This can't be undone.
         </p>
-      </section>
-
-      <RegionToggle region={region} setRegion={setRegion} />
-
-      <section className="grid grid-cols-2 gap-4">
-        <Card label="Currency (full)" value={formatCurrency(DEMO_VALUE, region)} />
-        <Card label="Currency (compact)" value={formatCurrencyCompact(DEMO_VALUE, region)} />
-        <Card label="Number (grouped)" value={formatNumber(DEMO_VALUE, region)} />
-        <Card label="Fiscal year + Q" value={`${fyLabel(today, region)} · ${fyQuarter(today, region)}`} />
-      </section>
-    </div>
-  );
-}
-
-function Card({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border border-ink-700/60 rounded-lg p-4 bg-ink-800/40">
-      <div className="text-[11px] uppercase tracking-wider text-ink-300">{label}</div>
-      <div className="mt-1 text-xl font-mono numeric text-accent-glow">{value}</div>
-    </div>
-  );
-}
-
-function RegionToggle({ region, setRegion }: { region: RegionCode; setRegion: (r: RegionCode) => void }) {
-  const opts: RegionCode[] = ["US", "IN"];
-  return (
-    <div className="flex items-center rounded-md border border-ink-700/60 overflow-hidden text-[12px] w-fit">
-      {opts.map((r) => (
         <button
-          key={r}
-          onClick={() => setRegion(r)}
-          className={[
-            "px-3 py-1.5 transition-colors",
-            region === r
-              ? "bg-accent text-accent-foreground font-semibold"
-              : "bg-ink-800/40 text-ink-200 hover:bg-ink-700/60",
-          ].join(" ")}
+          onClick={remove}
+          disabled={busy}
+          className="text-[12px] px-3 py-1.5 rounded border border-red-900/60 text-red-300 hover:bg-red-950/40 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {r}
+          Delete project
         </button>
-      ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Explore: consume a project ----------
+
+type ExploreTab = "ask" | "pivots" | "dashboards" | "cohorts" | "snapshots";
+
+function ExploreSurface({ project }: { project: Project | null }) {
+  const [tab, setTab] = useState<ExploreTab>("ask");
+  if (!project) {
+    return (
+      <div className="text-[13px] text-ink-300 border border-ink-700/60 rounded-lg p-8 bg-ink-800/30 text-center">
+        Pick a project from the selector above to explore its data.
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-end">
+        <div className="flex items-center rounded-md border border-ink-700/60 overflow-hidden text-[12px]">
+          {(["ask", "pivots", "dashboards", "cohorts", "snapshots"] as ExploreTab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={[
+                "px-3 py-1.5 capitalize transition-colors",
+                tab === t ? "bg-accent text-accent-foreground font-semibold" : "bg-ink-800/40 text-ink-200 hover:bg-ink-700/60",
+              ].join(" ")}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+      {tab === "ask" && <ChatView projectId={project.id} />}
+      {tab === "pivots" && <PivotView projectId={project.id} />}
+      {tab === "dashboards" && <DashboardsView projectId={project.id} />}
+      {tab === "cohorts" && <CohortsView projectId={project.id} />}
+      {tab === "snapshots" && <SnapshotsView projectId={project.id} />}
     </div>
   );
 }

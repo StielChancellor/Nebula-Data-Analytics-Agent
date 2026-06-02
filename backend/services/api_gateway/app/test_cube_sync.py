@@ -116,3 +116,29 @@ class TestCubeGenJob:
         assert results["bob"]["file_count"] == 1
         # Each tenant's model is isolated in the offline store
         assert read_offline_model("alice")["version"] != read_offline_model("bob")["version"]
+
+
+class TestProjectScopedSync:
+    def test_sync_project_writes_per_project_model(self, client: TestClient) -> None:
+        from services.api_gateway.app.cube_sync_service import sync_project
+
+        ds = _ready_dataset("dsp1", "Sales")
+        ds.project_id = "projA"
+        save_dataset(ds)
+        _cols("dsp1", [("city", "STRING", 0.2), ("revenue", "NUMERIC", 0.05)])
+
+        result = sync_project("default", "projA")
+        assert result["file_count"] == 1
+        # model lands under the per-project key, NOT the legacy tenant key
+        assert read_offline_model("default", "projA") != {}
+        assert read_offline_model("default") == {}
+
+    def test_sync_all_covers_projects_and_legacy(self, client: TestClient) -> None:
+        a = _ready_dataset("dpa", "A"); a.project_id = "p1"; save_dataset(a)
+        _cols("dpa", [("k", "STRING", 0.2)])
+        _ready_dataset("dleg", "Legacy")  # no project_id
+        _cols("dleg", [("k", "STRING", 0.2)])
+
+        out = sync_all_tenants()
+        assert "default/p1" in out       # project model
+        assert "default" in out          # legacy tenant model

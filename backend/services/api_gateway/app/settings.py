@@ -27,9 +27,41 @@ class Settings(BaseSettings):
     bq_raw_dataset: str = Field(default="raw", alias="INSNAV_BQ_RAW_DATASET")
     """BigQuery dataset that holds raw_<id> tables (L0 landing per PRD)."""
 
+    # SEC M4 / $5 guardrail: hard ceiling on bytes billed per query job. Bounds the
+    # cost of any single profiler/edge/normalize query (10 GB ≈ $0.05 at $5/TB).
+    bq_max_bytes_billed: int = Field(
+        default=10 * 1024 * 1024 * 1024, alias="INSNAV_BQ_MAX_BYTES_BILLED"
+    )
+    # Phase 11 #4 cost preview: above this estimated scan size (GB) the UI warns
+    # and asks the user to approve before running a (potentially pricey) query.
+    bq_cost_preview_gb_threshold: float = Field(
+        default=5.0, alias="INSNAV_BQ_COST_PREVIEW_GB_THRESHOLD"
+    )
+
     # Firestore collection name for dataset metadata
     fs_datasets_collection: str = Field(
         default="datasets", alias="INSNAV_FS_DATASETS_COLLECTION"
+    )
+    # Firestore collection for project workspaces (Phase 10). A project groups
+    # datasets + graph + cube model + locale + onboarding under one tenant.
+    fs_projects_collection: str = Field(
+        default="projects", alias="INSNAV_FS_PROJECTS_COLLECTION"
+    )
+    # Firestore collection for agent-led ingestion/onboarding sessions (Phase 10).
+    fs_ingest_sessions_collection: str = Field(
+        default="ingest_sessions", alias="INSNAV_FS_INGEST_SESSIONS_COLLECTION"
+    )
+    # Firestore collection for pinnable dashboards (Phase 8).
+    fs_dashboards_collection: str = Field(
+        default="dashboards", alias="INSNAV_FS_DASHBOARDS_COLLECTION"
+    )
+    # Cohort segments (Phase 11 #2) — named saved filter-sets per project.
+    fs_segments_collection: str = Field(
+        default="segments", alias="INSNAV_FS_SEGMENTS_COLLECTION"
+    )
+    # Result snapshots (Phase 11 #3) — captured query results for diffing.
+    fs_snapshots_collection: str = Field(
+        default="snapshots", alias="INSNAV_FS_SNAPSHOTS_COLLECTION"
     )
 
     # --- Cube (Phase 5b) ---
@@ -44,7 +76,10 @@ class Settings(BaseSettings):
     cube_api_url: str = Field(default="", alias="INSNAV_CUBE_API_URL")
     # Shared secret used to sign Cube API tokens (matches Cube's CUBEJS_API_SECRET).
     # Read from Secret Manager in prod; falls back to a dev value offline.
-    cube_api_secret: str = Field(default="dev-cube-secret-change-me", alias="INSNAV_CUBE_API_SECRET")
+    # No baked-in default (SEC H3): a known default would let anyone mint a Cube
+    # token for any tenant. Empty offline (Cube is stubbed); set from Secret
+    # Manager in prod.
+    cube_api_secret: str = Field(default="", alias="INSNAV_CUBE_API_SECRET")
 
     # --- Firebase Auth / Identity Platform (Phase 1.5) ---
     # Project that issues Firebase ID tokens. Empty → falls back to gcp_project.
@@ -68,6 +103,9 @@ class Settings(BaseSettings):
     upload_signed_url_ttl_seconds: int = Field(
         default=3600, alias="INSNAV_UPLOAD_TTL_SECONDS"
     )
+    # Read-before-commit preview (Phase 10-B): how many bytes of the uploaded
+    # blob to sniff. 64 KB is plenty to infer types and is file-size-independent.
+    preview_sample_bytes: int = Field(default=65536, alias="INSNAV_PREVIEW_SAMPLE_BYTES")
 
     # When true, skip live GCP calls (used in pytest). Defaults to detecting
     # the env var PYTEST_CURRENT_TEST so test runs are offline by default.

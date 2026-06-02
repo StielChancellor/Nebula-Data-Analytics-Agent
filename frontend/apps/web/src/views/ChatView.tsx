@@ -11,7 +11,7 @@ import { useAuth } from "@insnav/auth";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
-export function ChatView() {
+export function ChatView({ projectId }: { projectId?: string } = {}) {
   const auth = useAuth();
   const client = useMemo(
     () => new ApiClient({ baseUrl: API_BASE, getToken: auth.getToken }),
@@ -19,7 +19,7 @@ export function ChatView() {
   );
 
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState<ChatAnswer | null>(null);
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [models, setModels] = useState<LlmOption[]>([]);
@@ -37,11 +37,14 @@ export function ChatView() {
   }, [client]);
 
   const ask = async () => {
-    if (!question.trim()) return;
+    const q = question.trim();
+    if (!q) return;
     setBusy(true);
     setError(null);
     try {
-      setAnswer(await client.chat(question.trim(), [], model || undefined));
+      const a = await client.chat(q, { llm: model || undefined, projectId });
+      setTurns((prev) => [...prev, { question: q, answer: a }]);
+      setQuestion("");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -59,22 +62,32 @@ export function ChatView() {
             answer shows what it understood, the data health, and the exact query it ran.
           </p>
         </div>
-        {models.length > 0 && (
-          <label className="shrink-0 text-[11px] text-ink-300 flex items-center gap-2">
-            Brain
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="bg-ink-900 border border-ink-700/60 rounded px-2 py-1 text-[12px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent"
+        <div className="flex items-center gap-2 shrink-0">
+          {turns.length > 0 && (
+            <button
+              onClick={() => setTurns([])}
+              className="text-[11px] px-2 py-1 rounded border border-ink-700/60 text-ink-300 hover:bg-ink-700/40"
             >
-              {models.map((m) => (
-                <option key={m.id} value={m.id} disabled={!m.available}>
-                  {m.label}{m.available ? "" : " (not configured)"}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+              Clear
+            </button>
+          )}
+          {models.length > 0 && (
+            <label className="text-[11px] text-ink-300 flex items-center gap-2">
+              Brain
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="bg-ink-900 border border-ink-700/60 rounded px-2 py-1 text-[12px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                {models.map((m) => (
+                  <option key={m.id} value={m.id} disabled={!m.available}>
+                    {m.label}{m.available ? "" : " (not configured)"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
       </header>
 
       <div className="flex items-start gap-2">
@@ -103,9 +116,23 @@ export function ChatView() {
         </div>
       )}
 
-      {answer && <AnswerCard answer={answer} />}
+      {/* Multi-turn transcript (Tier B) — newest last. */}
+      {turns.map((t, i) => (
+        <div key={i} className="space-y-2">
+          <div className="text-[12px] text-ink-200 flex items-start gap-2">
+            <span className="text-accent-glow shrink-0">You</span>
+            <span>{t.question}</span>
+          </div>
+          <AnswerCard answer={t.answer} />
+        </div>
+      ))}
     </section>
   );
+}
+
+interface Turn {
+  question: string;
+  answer: ChatAnswer;
 }
 
 function AnswerCard({ answer }: { answer: ChatAnswer }) {

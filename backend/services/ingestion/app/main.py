@@ -1,3 +1,7 @@
+# NOT DEPLOYED - Phase-0 scaffold only. The real logic runs IN-PROCESS in
+# services/api_gateway (swarm/onboarding/ingestion/edge_proposer). This file is
+# an extraction boundary for future independent scaling; no Cloud Run resource
+# points at it. See backend/README.md.
 """
 ingestion — Cloud Run JOB. GCS → BQ raw load + profiler + schema catalog.
 Phase 0: stub. Phase 2: real implementation.

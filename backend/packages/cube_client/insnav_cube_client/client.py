@@ -47,12 +47,16 @@ class CubeQueryClient:
         api_secret: str,
         offline: bool = False,
         timeout_s: float = 30.0,
+        project_id: str | None = None,
     ) -> None:
         self.api_url = api_url.rstrip("/")
         self.api_secret = api_secret
         # Offline if explicitly requested OR no API url configured yet.
         self.offline = offline or not self.api_url
         self.timeout_s = timeout_s
+        # Project workspace (Phase 10): carried in the Cube security context so
+        # the Cube container compiles + serves the project's model in isolation.
+        self.project_id = project_id
 
     # ---------- public API ----------
 
@@ -77,7 +81,10 @@ class CubeQueryClient:
     # ---------- internals ----------
 
     def _token(self, tenant_id: str) -> str:
-        return mint_cube_token(secret=self.api_secret, security_context={"tenant_id": tenant_id})
+        ctx: dict[str, Any] = {"tenant_id": tenant_id}
+        if self.project_id:
+            ctx["project_id"] = self.project_id
+        return mint_cube_token(secret=self.api_secret, security_context=ctx)
 
     def _post(self, path: str, body: dict[str, Any], *, tenant_id: str) -> dict[str, Any]:
         import httpx

@@ -28,9 +28,19 @@ from services.api_gateway.app.auth import (
     issue_token,
 )
 from services.api_gateway.app.chat_router import router as chat_router
+from services.api_gateway.app.cohorts_router import router as cohorts_router
 from services.api_gateway.app.cube_router import router as cube_router
+from services.api_gateway.app.dashboards_router import router as dashboards_router
 from services.api_gateway.app.datasets_router import router as datasets_router
 from services.api_gateway.app.edges_router import router as edges_router
+from services.api_gateway.app.ingest_router import router as ingest_router
+from services.api_gateway.app.lineage_router import router as lineage_router
+from services.api_gateway.app.metrics_router import router as metrics_router
+from services.api_gateway.app.notebook_router import router as notebook_router
+from services.api_gateway.app.pivot_router import router as pivot_router
+from services.api_gateway.app.projects_router import router as projects_router
+from services.api_gateway.app.snapshots_router import router as snapshots_router
+from services.api_gateway.app.xray_router import router as xray_router
 from services.api_gateway.app.settings import get_settings
 from services.api_gateway.app.uploads import router as uploads_router
 
@@ -48,7 +58,10 @@ _settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_settings.cors_origins.split(","),
-    allow_credentials=True,
+    # SEC M1: this is a bearer-token API (no cookies), so credentialed CORS is
+    # not needed. Disabling it avoids the wildcard-origin + credentials hazard
+    # (a reflected "*" with credentials lets any site make authenticated calls).
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -75,6 +88,7 @@ class BrandConfig(BaseModel):
 
 
 @app.get("/healthz")
+@app.get("/health")  # alias: Google's Front End shadows /healthz on *.run.app
 def healthz() -> dict[str, str]:
     return {"status": "ok", "service": "api_gateway", "version": app.version}
 
@@ -134,3 +148,13 @@ app.include_router(uploads_router)
 app.include_router(edges_router)
 app.include_router(cube_router)
 app.include_router(chat_router)
+app.include_router(projects_router)
+app.include_router(ingest_router)
+app.include_router(pivot_router)
+app.include_router(dashboards_router)
+app.include_router(lineage_router)
+app.include_router(metrics_router)
+app.include_router(notebook_router)
+app.include_router(cohorts_router)
+app.include_router(snapshots_router)
+app.include_router(xray_router)

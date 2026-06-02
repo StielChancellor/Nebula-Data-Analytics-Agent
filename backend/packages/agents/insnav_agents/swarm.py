@@ -28,6 +28,53 @@ from .schemas import ChatAnswer, DataHealthBadge, Interpretation
 # (PRD mitigation #2: prefer a clarifying question over a confident wrong one).
 _CLARIFY_THRESHOLD = 0.45
 
+# ---------- causal-inference guardrail (PRD §11.7) ----------
+# Explicit causal-CLAIM connectors. Plain "why did X drop" is diagnostic and
+# routes to decomposition — it is NOT trapped here. Only assertions that one
+# thing *caused* another are gated, because asserting causation from
+# observational warehouse data without an identification strategy is the #1
+# BI-LLM embarrassment.
+_CAUSAL_TRIGGERS = (
+    "cause", "caused", "causes", "causal", "causation",
+    "effect of", "effect on", "impact of", "impact on",
+    "because of", "due to", "result of", "as a result of",
+    "led to", "lead to", "drove", "driven by", "thanks to",
+    "attribut", "responsible for", "contributed to", "knock-on",
+)
+# A stated identification strategy lets the request through (with a caveat).
+_STRATEGY_TERMS = (
+    "difference-in-difference", "difference in difference", "differences-in-difference",
+    "diff-in-diff", "diff in diff",
+    "regression discontinuity", "rdd",
+    "instrumental variable", "instrumented", "instrument variable",
+    "randomized", "randomised", "randomized controlled", "rct",
+    "a/b test", "ab test", "split test", "holdout", "hold-out",
+    "control group", "treatment group", "counterfactual", "synthetic control",
+    "natural experiment", "propensity", "fixed effects", "event study",
+)
+
+
+def detect_causal_request(question: str) -> tuple[bool, bool]:
+    """Return (is_causal_claim, identification_strategy_stated). Deterministic —
+    no LLM, so the guardrail holds even when the brain is offline/stubbed."""
+    q = question.lower()
+    is_causal = any(t in q for t in _CAUSAL_TRIGGERS)
+    has_strategy = any(t in q for t in _STRATEGY_TERMS)
+    return is_causal, has_strategy
+
+
+_CAUSAL_REFUSAL = (
+    "That asks whether one thing *caused* another. Establishing causation from "
+    "observational data needs a stated identification strategy — otherwise the "
+    "honest answer is correlation, not cause. Re-ask with one of: a "
+    "difference-in-differences design (a comparable control group over the same "
+    "period), a regression discontinuity (a threshold that splits treated vs "
+    "untreated), an instrumental variable, or a randomized/holdout experiment. "
+    "Or ask me descriptively — e.g. \"break down the change in Y by segment\" or "
+    "\"show X and Y over time\" — and I'll give you the decomposition without "
+    "claiming causation."
+)
+
 
 # ---------- catalog (the grounding surface) ----------
 
@@ -204,11 +251,11 @@ def run_specialist_analysis(
             return stats.run_analysis("forecast", series=series, periods=int(directive.get("periods", 3)))
         return stats.run_analysis(method, values=series)
 
-    if method == "correlation":
+    if method in ("correlation", "regression"):
         x, y = column(directive.get("x_field")), column(directive.get("y_field"))
         if not x or not y:
-            return stats._envelope("correlation", {}, confidence=0.0, caveats=["x_field/y_field not in result"])
-        return stats.run_analysis("correlation", x=x, y=y)
+            return stats._envelope(method, {}, confidence=0.0, caveats=["x_field/y_field not in result"])
+        return stats.run_analysis(method, x=x, y=y)
 
     if method == "significance":
         vi = col_index.get(directive.get("value_field"))
@@ -270,6 +317,19 @@ async def answer_question(
             interpretation_echo="",
         )
 
+    # Causal-inference guardrail (PRD §11.7) — refuse a causal CLAIM that has no
+    # stated identification strategy, before we ever touch the LLM or Cube.
+    is_causal, has_strategy = detect_causal_request(question)
+    if is_causal and not has_strategy:
+        return ChatAnswer(
+            kind="refuse",
+            message=_CAUSAL_REFUSAL,
+            interpretation_echo="Causal question detected — identification strategy required.",
+            analysis_level="diagnostic",
+            confidence=0.0,
+            caveats=["No identification strategy (DiD / RDD / IV / randomized) was stated."],
+        )
+
     catalog_text, valid_names = build_catalog(schemas)
     interp = await interpret(question, catalog_text, router)
 
@@ -308,6 +368,12 @@ async def answer_question(
     caveats: list[str] = []
     if result.get("_stub"):
         caveats.append("Cube is not deployed in this environment — results are illustrative (stub).")
+    if is_causal and has_strategy:
+        caveats.append(
+            "Causal framing accepted (identification strategy stated). v1 returns the "
+            "descriptive decomposition for that design; treat the estimate as the "
+            "design-conditioned association, not a fully adjusted causal effect."
+        )
 
     # Phase 9: if the LLM requested an inferential analysis, run the
     # deterministic specialist method on the result (Stats/Maths agent).

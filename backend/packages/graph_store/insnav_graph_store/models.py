@@ -29,6 +29,9 @@ class GraphEdge(BaseModel):
 
     id: str = Field(default_factory=lambda: uuid4().hex)
     tenant_id: str
+    # Project workspace this edge belongs to (Phase 10). Both datasets of the
+    # edge live in this project. None = legacy/tenant-wide edge (pre-projects).
+    project_id: str | None = None
 
     from_dataset: str       # dataset_id (not the BQ table fqn)
     from_column: str

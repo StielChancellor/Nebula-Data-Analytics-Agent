@@ -86,16 +86,67 @@ def reject_edge(edge_id: str, *, reviewer_email: str) -> GraphEdge:
     return edge
 
 
-def list_approved_edges(tenant_id: str) -> list[GraphEdge]:
-    return _list_by_state(tenant_id, "approved")
+def list_approved_edges(tenant_id: str, project_id: str | None = None) -> list[GraphEdge]:
+    """Approved edges for a tenant. If project_id is given, scope to that project."""
+    return _list_by_state(tenant_id, "approved", project_id)
 
 
-def list_proposed_edges(tenant_id: str) -> list[GraphEdge]:
-    return _list_by_state(tenant_id, "proposed")
+def list_proposed_edges(tenant_id: str, project_id: str | None = None) -> list[GraphEdge]:
+    """Proposed edges for a tenant. If project_id is given, scope to that project."""
+    return _list_by_state(tenant_id, "proposed", project_id)
 
 
 def get_edge(edge_id: str) -> GraphEdge | None:
     return _get(edge_id)
+
+
+def delete_edge(edge_id: str) -> bool:
+    """Remove a single edge. Returns True if it existed. Idempotent."""
+    if _offline():
+        return _OFFLINE_EDGES.pop(edge_id, None) is not None
+
+    from services.api_gateway.app.gcp_clients import firestore_client
+
+    ref = firestore_client().collection(_FS_COLLECTION).document(edge_id)
+    existed = ref.get().exists
+    ref.delete()
+    return existed
+
+
+def delete_edges_for_dataset(tenant_id: str, dataset_id: str) -> int:
+    """
+    Delete every edge (any state) touching a dataset in either direction.
+    Used when a dataset is deleted so no stale joins linger. Returns the count.
+    """
+    if _offline():
+        victims = [
+            eid
+            for eid, d in _OFFLINE_EDGES.items()
+            if d.get("tenant_id") == tenant_id
+            and (d.get("from_dataset") == dataset_id or d.get("to_dataset") == dataset_id)
+        ]
+        for eid in victims:
+            _OFFLINE_EDGES.pop(eid, None)
+        return len(victims)
+
+    # Firestore can't OR two fields; scan the tenant's edges in-process.
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
+    from services.api_gateway.app.gcp_clients import firestore_client
+
+    fs = firestore_client()
+    docs = (
+        fs.collection(_FS_COLLECTION)
+        .where(filter=FieldFilter("tenant_id", "==", tenant_id))
+        .stream()
+    )
+    count = 0
+    for d in docs:
+        data = d.to_dict() or {}
+        if data.get("from_dataset") == dataset_id or data.get("to_dataset") == dataset_id:
+            d.reference.delete()
+            count += 1
+    return count
 
 
 # ---------- Path queries (NetworkX on the approved-edges subgraph) ----------
@@ -175,27 +226,32 @@ def _get(edge_id: str) -> GraphEdge | None:
     return GraphEdge(**doc.to_dict())
 
 
-def _list_by_state(tenant_id: str, state: EdgeState) -> list[GraphEdge]:
+def _list_by_state(
+    tenant_id: str, state: EdgeState, project_id: str | None = None
+) -> list[GraphEdge]:
     if _offline():
         return [
             GraphEdge(**d)
             for d in _OFFLINE_EDGES.values()
-            if d.get("tenant_id") == tenant_id and d.get("state") == state
+            if d.get("tenant_id") == tenant_id
+            and d.get("state") == state
+            and (project_id is None or d.get("project_id") == project_id)
         ]
 
     from google.cloud.firestore_v1.base_query import FieldFilter
 
     from services.api_gateway.app.gcp_clients import firestore_client
 
-    docs = (
+    query = (
         firestore_client()
         .collection(_FS_COLLECTION)
         .where(filter=FieldFilter("tenant_id", "==", tenant_id))
         .where(filter=FieldFilter("state", "==", state))
-        .stream()
     )
+    if project_id is not None:
+        query = query.where(filter=FieldFilter("project_id", "==", project_id))
     out: list[GraphEdge] = []
-    for d in docs:
+    for d in query.stream():
         data = d.to_dict()
         if data:
             out.append(GraphEdge(**data))

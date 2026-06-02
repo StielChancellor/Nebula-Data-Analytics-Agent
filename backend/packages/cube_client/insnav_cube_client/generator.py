@@ -169,8 +169,52 @@ def build_cube_schema(
         col_type = c.get("type", "STRING")
         cube_type = bq_type_to_cube_type(col_type)
         key_likeness = float(c.get("key_likeness") or 0.0)
+        safe_col = _sanitize_identifier(col_name)
 
-        # Primary key: first column with very high key-likeness.
+        # Human-confirmed semantics (Phase 10-C) are merged onto the column dict
+        # by save_column_semantics. When present they OVERRIDE the heuristics.
+        role = c.get("role")
+        if role:
+            if role == "ignore":
+                continue  # explicitly excluded from the model
+
+            title = c.get("display_title") or col_name
+            description = c.get("business_meaning") or None
+
+            if role == "measure":
+                agg = c.get("measure_aggregation") or "sum"
+                # Revenue gating (PRD #3): only a HUMAN-CONFIRMED revenue column
+                # (confirmed_by set) becomes a revenue-touching measure.
+                is_rev = bool(c.get("is_revenue")) and bool(c.get("confirmed_by"))
+                measures.append(
+                    CubeMeasure(
+                        name=f"{agg}_{safe_col}",
+                        type=agg,  # type: ignore[arg-type]
+                        sql=None if agg == "count" else f"`{col_name}`",
+                        title=c.get("display_title") or f"{str(agg).title()} of {col_name}",
+                        description=description,
+                        revenue_touching=is_rev,
+                    )
+                )
+            else:
+                # dimension | time | identifier → a dimension
+                is_pk = False
+                if role == "identifier" and (c.get("join_key") or True) and not primary_key_assigned:
+                    is_pk = True
+                    primary_key_assigned = True
+                dims.append(
+                    CubeDimension(
+                        name=safe_col,
+                        sql=f"`{col_name}`",
+                        type=("time" if role == "time" else cube_type),  # type: ignore[arg-type]
+                        primary_key=is_pk,
+                        title=title,
+                        description=description,
+                    )
+                )
+            continue
+
+        # ---- heuristic path (no confirmed semantics) ----
         is_pk = False
         if not primary_key_assigned and key_likeness >= 0.85:
             is_pk = True
@@ -178,7 +222,7 @@ def build_cube_schema(
 
         dims.append(
             CubeDimension(
-                name=_sanitize_identifier(col_name),
+                name=safe_col,
                 sql=f"`{col_name}`",
                 type=cube_type,  # type: ignore[arg-type]
                 primary_key=is_pk,
@@ -189,7 +233,6 @@ def build_cube_schema(
         # Numeric columns with low key-likeness become sum + avg measures.
         # High-key-likeness numerics are foreign keys → no aggregation.
         if cube_type == "number" and key_likeness < 0.7:
-            safe_col = _sanitize_identifier(col_name)
             is_revenue = _is_revenue_column(col_name)
             measures.append(
                 CubeMeasure(

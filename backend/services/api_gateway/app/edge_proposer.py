@@ -58,9 +58,17 @@ def propose_for_dataset(new_dataset: Dataset) -> list[GraphEdge]:
     if not new_keys:
         return []
 
-    # Compare against every other ready dataset for the same tenant
+    # Compare against every other ready dataset in the SAME project workspace
+    # (Phase 10). Projects are isolated, so we never propose joins across
+    # projects. Legacy datasets without a project_id fall back to tenant-wide.
+    if new_dataset.project_id is not None:
+        from services.api_gateway.app.datasets import list_datasets_for_project
+
+        candidates = list_datasets_for_project(new_dataset.tenant_id, new_dataset.project_id)
+    else:
+        candidates = list_datasets_for_tenant(new_dataset.tenant_id)
     peers = [
-        d for d in list_datasets_for_tenant(new_dataset.tenant_id)
+        d for d in candidates
         if d.id != new_dataset.id and d.status == "ready" and d.bq_table is not None
     ]
 
@@ -86,6 +94,7 @@ def propose_for_dataset(new_dataset: Dataset) -> list[GraphEdge]:
 
                 edge = GraphEdge(
                     tenant_id=new_dataset.tenant_id,
+                    project_id=new_dataset.project_id,
                     from_dataset=new_dataset.id,
                     from_column=new_col,
                     to_dataset=peer.id,
@@ -179,12 +188,16 @@ def build_overlap_sql(new_table: str, new_column: str, peer_table: str, peer_col
 
     Uses CAST to STRING so we can compare across slightly-different inferred
     types (BQ autodetect may give one side INT64 and the other STRING for the
-    same logical key).
+    same logical key). SEC C1: identifiers quoted+escaped.
     """
+    from services.api_gateway.app.sql_safety import quote_bq_identifier
+
+    nc, pc = quote_bq_identifier(new_column), quote_bq_identifier(peer_column)
+    nt, pt = quote_bq_identifier(new_table), quote_bq_identifier(peer_table)
     return f"""
 WITH
-  a AS (SELECT DISTINCT CAST(`{new_column}` AS STRING) AS v FROM `{new_table}` WHERE `{new_column}` IS NOT NULL),
-  b AS (SELECT DISTINCT CAST(`{peer_column}` AS STRING) AS v FROM `{peer_table}` WHERE `{peer_column}` IS NOT NULL),
+  a AS (SELECT DISTINCT CAST({nc} AS STRING) AS v FROM {nt} WHERE {nc} IS NOT NULL),
+  b AS (SELECT DISTINCT CAST({pc} AS STRING) AS v FROM {pt} WHERE {pc} IS NOT NULL),
   shared AS (SELECT a.v FROM a INNER JOIN b USING (v)),
   counts AS (
     SELECT

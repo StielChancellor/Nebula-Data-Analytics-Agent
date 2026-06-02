@@ -49,6 +49,32 @@ class ColumnProfile(BaseModel):
     key_likeness: float = 0.0         # 0..1, high = candidate join key (high cardinality + low null)
 
 
+class ColumnSpec(BaseModel):
+    """A confirmed/overridden column type used to drive an explicit BQ load.
+
+    `source_format` is a sniffer hint (e.g. 'DD-MM-YYYY', 'INR_GROUPED') that
+    triggers a normalize transform; None means the value loads as-is.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    bq_type: str                      # DATE | INT64 | NUMERIC | FLOAT64 | BOOL | STRING | TIMESTAMP
+    source_format: str | None = None
+
+
+class IngestError(BaseModel):
+    """Structured failure detail so the UI can show stage + actionable hint."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    stage: Literal["upload", "preview", "load", "profile", "discover"]
+    reason: str                       # machine-ish code, e.g. "schema_type_mismatch"
+    message: str                      # human sentence
+    hint: str | None = None           # actionable next step
+    sample_bad_rows: list[str] = Field(default_factory=list)
+
+
 class Dataset(BaseModel):
     """The Firestore record describing an uploaded dataset."""
 
@@ -56,6 +82,9 @@ class Dataset(BaseModel):
 
     id: str
     tenant_id: str
+    # Project workspace this dataset belongs to (Phase 10). None = unassigned
+    # (legacy datasets predating projects; the migration assigns a Default project).
+    project_id: str | None = None
     brand: str
     label: str                        # human-friendly name (defaults to original filename)
     locale_hint: Literal["US", "IN"] = "US"
@@ -69,6 +98,13 @@ class Dataset(BaseModel):
     created_at: str = Field(default_factory=lambda: dt.datetime.now(dt.timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: dt.datetime.now(dt.timezone.utc).isoformat())
     error: str | None = None
+    # Structured failure detail (Phase 10-B). `error` stays = error_detail.message
+    # for back-compat with the existing api-client `error: string | null`.
+    error_detail: IngestError | None = None
+    # Read-before-commit preview produced by the sniffer (Phase 10-B): encoding,
+    # delimiter, header, per-column inferred types + samples. Stored as a plain
+    # dict to avoid a model import cycle.
+    preview: dict[str, Any] | None = None
 
 
 # ---------- helpers ----------
@@ -180,6 +216,35 @@ def list_datasets_for_tenant(tenant_id: str) -> list[Dataset]:
     return out
 
 
+def list_datasets_for_project(tenant_id: str, project_id: str) -> list[Dataset]:
+    """Datasets belonging to a specific project workspace (Phase 10)."""
+    if _offline():
+        return [
+            Dataset(**d)
+            for d in _OFFLINE_DATASETS.values()
+            if d.get("tenant_id") == tenant_id and d.get("project_id") == project_id
+        ]
+
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
+    from services.api_gateway.app.gcp_clients import firestore_client
+    from services.api_gateway.app.settings import get_settings
+
+    docs = (
+        firestore_client()
+        .collection(get_settings().fs_datasets_collection)
+        .where(filter=FieldFilter("tenant_id", "==", tenant_id))
+        .where(filter=FieldFilter("project_id", "==", project_id))
+        .stream()
+    )
+    out: list[Dataset] = []
+    for doc in docs:
+        data = doc.to_dict()
+        if data:
+            out.append(Dataset(**data))
+    return out
+
+
 def list_all_ready_datasets() -> list[Dataset]:
     """All ready datasets across every tenant. Used by the cube_gen job to
     rebuild the full Cube model. Tenant-scoped reads use
@@ -238,10 +303,67 @@ def save_column_profiles(dataset_id: str, profiles: list[ColumnProfile]) -> None
         .document(dataset_id)
         .collection("columns")
     )
+    # Idempotency (Phase 10-B): a re-ingest with a different schema must not
+    # leave orphan column docs from the prior run. Delete-then-write.
+    for existing in col.stream():
+        existing.reference.delete()
     batch = fs.batch()
     for p in profiles:
         batch.set(col.document(p.name), p.model_dump())
     batch.commit()
+
+
+def delete_dataset_record(dataset_id: str) -> None:
+    """Delete the dataset doc + its columns subcollection (Firestore has no cascade)."""
+    if _offline():
+        _OFFLINE_DATASETS.pop(dataset_id, None)
+        _OFFLINE_COLUMNS.pop(dataset_id, None)
+        return
+
+    from services.api_gateway.app.gcp_clients import firestore_client
+    from services.api_gateway.app.settings import get_settings
+
+    doc = (
+        firestore_client()
+        .collection(get_settings().fs_datasets_collection)
+        .document(dataset_id)
+    )
+    # Delete children (columns) first, then the parent doc.
+    for col in doc.collection("columns").stream():
+        col.reference.delete()
+    doc.delete()
+
+
+def save_column_semantics(dataset_id: str, semantics: dict[str, dict[str, Any]]) -> None:
+    """
+    Merge human-confirmed ColumnSemantics onto the existing columns subcollection
+    (Phase 10-C). The Cube generator then reads role/is_revenue/aggregation/etc.
+    off the same column dict that already carries the profile stats — no second
+    read path. `semantics` maps column name -> semantics fields (the `column`
+    key, if present, is dropped since the doc is already keyed by name).
+    """
+    cleaned = {
+        name: {k: v for k, v in sem.items() if k != "column"}
+        for name, sem in semantics.items()
+    }
+    if _offline():
+        cols = _OFFLINE_COLUMNS.setdefault(dataset_id, {})
+        for name, sem in cleaned.items():
+            existing = cols.setdefault(name, {"name": name})
+            existing.update(sem)
+        return
+
+    from services.api_gateway.app.gcp_clients import firestore_client
+    from services.api_gateway.app.settings import get_settings
+
+    col = (
+        firestore_client()
+        .collection(get_settings().fs_datasets_collection)
+        .document(dataset_id)
+        .collection("columns")
+    )
+    for name, sem in cleaned.items():
+        col.document(name).set(sem, merge=True)
 
 
 def update_dataset_status(
@@ -252,6 +374,8 @@ def update_dataset_status(
     row_count: int | None = None,
     column_count: int | None = None,
     error: str | None = None,
+    error_detail: "IngestError | None" = None,
+    preview: dict[str, Any] | None = None,
 ) -> None:
     patch: dict[str, Any] = {
         "status": status,
@@ -265,6 +389,11 @@ def update_dataset_status(
         patch["column_count"] = column_count
     if error is not None:
         patch["error"] = error
+    if error_detail is not None:
+        patch["error_detail"] = error_detail.model_dump()
+        patch["error"] = error_detail.message  # keep flat error in sync
+    if preview is not None:
+        patch["preview"] = preview
 
     if _offline():
         existing = _OFFLINE_DATASETS.get(dataset_id)
