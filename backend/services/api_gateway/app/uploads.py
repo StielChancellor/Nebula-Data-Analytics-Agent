@@ -263,7 +263,13 @@ def complete_upload(
         logger.exception("upload complete failed for dataset %s at stage %s", ds.id, stage)
         detail = _classify_ingest_failure(stage, e)  # type: ignore[arg-type]
         update_dataset_status(ds.id, "failed", error_detail=detail)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail.message) from e
+        # SEC H4: don't echo the raw exception (table names / SQL) in the 500 body.
+        # The curated reason + hint are persisted on the dataset for the owner to
+        # read via GET /v1/datasets/{id}.
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            f"ingestion failed at the {stage} stage; see the dataset's error detail.",
+        ) from e
 
     # Phase 4: auto-discover edges for the just-loaded dataset. Best-effort —
     # the dataset is already 'ready', so a discovery hiccup must not fail it.
@@ -350,25 +356,40 @@ def _strptime_fmt(source_format: str) -> str:
     return source_format.replace("YYYY", "%Y").replace("DD", "%d").replace("MM", "%m")
 
 
+_ALLOWED_BQ_TYPES = {
+    "DATE", "INT64", "NUMERIC", "FLOAT64", "BOOL", "STRING", "TIMESTAMP", "DATETIME", "TIME",
+}
+
+
 def build_normalize_sql(table_fqn: str, specs: list[ColumnSpec]) -> str:
     """
     CREATE-OR-REPLACE the loaded raw table, normalizing India-locale columns:
     DD-MM-YYYY dates via SAFE.PARSE_DATE, ₹/grouped numbers via regex-strip +
     SAFE_CAST. SAFE.* turns bad cells into NULL (surfaced via the profiler's
     null_pct) rather than failing the whole job. Pure string builder (testable).
+
+    SEC C1: every identifier is quoted+escaped (quote_bq_identifier) and the
+    date format + bq_type are validated against allowlists, so an attacker-
+    controlled column name/format from a CSV header cannot inject SQL.
     """
+    from services.api_gateway.app.sql_safety import quote_bq_identifier, safe_date_format
+
     exprs: list[str] = []
     for s in specs:
-        col = f"`{s.name}`"
+        col = quote_bq_identifier(s.name)
+        if s.bq_type not in _ALLOWED_BQ_TYPES:
+            raise ValueError(f"unsupported bq_type: {s.bq_type!r}")
         if _needs_normalize(s) and s.bq_type == "DATE":
-            exprs.append(f"SAFE.PARSE_DATE('{_strptime_fmt(s.source_format)}', {col}) AS {col}")
+            fmt = safe_date_format(_strptime_fmt(s.source_format or ""))
+            exprs.append(f"SAFE.PARSE_DATE('{fmt}', {col}) AS {col}")
         elif _needs_normalize(s) and s.bq_type in ("NUMERIC", "FLOAT64", "INT64"):
             cleaned = f"REGEXP_REPLACE({col}, r'[^0-9.\\-]', '')"
             exprs.append(f"SAFE_CAST({cleaned} AS {s.bq_type}) AS {col}")
         else:
             exprs.append(f"{col} AS {col}")
     select_sql = ",\n  ".join(exprs)
-    return f"CREATE OR REPLACE TABLE `{table_fqn}` AS\nSELECT\n  {select_sql}\nFROM `{table_fqn}`"
+    tbl = quote_bq_identifier(table_fqn)
+    return f"CREATE OR REPLACE TABLE {tbl} AS\nSELECT\n  {select_sql}\nFROM {tbl}"
 
 
 def _classify_ingest_failure(stage: str, exc: Exception) -> IngestError:

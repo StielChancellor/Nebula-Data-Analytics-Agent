@@ -29,7 +29,7 @@ from insnav_graph_store import (
 )
 from insnav_graph_store.store import get_edge
 
-from services.api_gateway.app.auth import Principal, current_principal
+from services.api_gateway.app.auth import Principal, current_principal, require_admin
 from services.api_gateway.app.datasets import get_dataset as get_ds
 from services.api_gateway.app.edge_proposer import propose_for_dataset
 
@@ -41,21 +41,24 @@ router = APIRouter(tags=["edges"])
 @router.get("/v1/edges", response_model=list[GraphEdge])
 def list_edges(
     principal: Annotated[Principal, Depends(current_principal)],
+    project_id: str | None = None,
 ) -> list[GraphEdge]:
-    return list_approved_edges(principal.tenant_id)
+    # Project-scoped when ?project_id given, so a workspace shows only its edges.
+    return list_approved_edges(principal.tenant_id, project_id)
 
 
 @router.get("/v1/edges/proposals", response_model=list[GraphEdge])
 def list_proposals(
     principal: Annotated[Principal, Depends(current_principal)],
+    project_id: str | None = None,
 ) -> list[GraphEdge]:
-    return list_proposed_edges(principal.tenant_id)
+    return list_proposed_edges(principal.tenant_id, project_id)
 
 
 @router.post("/v1/edges/{edge_id}/approve", response_model=GraphEdge)
 def approve(
     edge_id: str,
-    principal: Annotated[Principal, Depends(current_principal)],
+    principal: Annotated[Principal, Depends(require_admin)],  # SEC H1: governance
 ) -> GraphEdge:
     edge = get_edge(edge_id)
     if edge is None or edge.tenant_id != principal.tenant_id:
@@ -83,7 +86,7 @@ def approve(
 @router.post("/v1/edges/{edge_id}/reject", response_model=GraphEdge)
 def reject(
     edge_id: str,
-    principal: Annotated[Principal, Depends(current_principal)],
+    principal: Annotated[Principal, Depends(require_admin)],  # SEC H1: governance
 ) -> GraphEdge:
     edge = get_edge(edge_id)
     if edge is None or edge.tenant_id != principal.tenant_id:

@@ -26,7 +26,7 @@ from insnav_cube_client import CubeSchema, build_cube_schema, cube_name_for_data
 from insnav_graph_store import list_approved_edges
 from pydantic import BaseModel
 
-from services.api_gateway.app.auth import Principal, current_principal
+from services.api_gateway.app.auth import Principal, current_principal, require_admin
 from services.api_gateway.app.cube_sync_service import sync_tenant
 from services.api_gateway.app.datasets import (
     Dataset,
@@ -65,7 +65,7 @@ class CubeSyncResult(BaseModel):
 
 @router.post("/v1/cube/sync", response_model=CubeSyncResult)
 def sync_cube_model_endpoint(
-    principal: Annotated[Principal, Depends(current_principal)],
+    principal: Annotated[Principal, Depends(require_admin)],  # SEC H1: governance
     project_id: str | None = None,
 ) -> CubeSyncResult:
     """
@@ -89,10 +89,17 @@ def sync_cube_model_endpoint(
 @router.get("/v1/cube/schemas", response_model=list[CubeSchemaSummary])
 def list_schemas(
     principal: Annotated[Principal, Depends(current_principal)],
+    project_id: str | None = None,
 ) -> list[CubeSchemaSummary]:
-    """One entry per dataset the principal can see. Compute schemas on demand."""
-    datasets = [d for d in list_datasets_for_tenant(principal.tenant_id) if d.status == "ready"]
-    edges = list_approved_edges(principal.tenant_id)
+    """One entry per dataset the principal can see. Compute schemas on demand.
+    Project-scoped when ?project_id is given (a workspace shows only its cubes)."""
+    if project_id:
+        from services.api_gateway.app.datasets import list_datasets_for_project
+
+        datasets = [d for d in list_datasets_for_project(principal.tenant_id, project_id) if d.status == "ready"]
+    else:
+        datasets = [d for d in list_datasets_for_tenant(principal.tenant_id) if d.status == "ready"]
+    edges = list_approved_edges(principal.tenant_id, project_id)
     edge_dicts = [e.model_dump() for e in edges]
     cube_name_lookup = {d.id: cube_name_for_dataset(d.id, d.label) for d in datasets}
 

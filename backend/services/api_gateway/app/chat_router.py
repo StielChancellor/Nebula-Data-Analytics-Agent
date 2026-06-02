@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from insnav_agents import ChatAnswer, answer_question
 from insnav_cube_client import CubeQueryClient, build_tenant_schemas
 from insnav_contracts.envelope import compute_inputs_hash
@@ -71,6 +71,18 @@ async def chat(
     principal: Annotated[Principal, Depends(current_principal)],
 ) -> ChatAnswer:
     settings = get_settings()
+
+    # SEC H2: a client-supplied project_id is fed into the Cube security context;
+    # verify it belongs to the caller's tenant before trusting it (mirrors the
+    # /uploads/start ownership check) so a user can't point the cube at another
+    # project's compiled model.
+    if req.project_id:
+        from services.api_gateway.app.projects import get_project
+
+        proj = get_project(req.project_id)
+        if proj is None or proj.tenant_id != principal.tenant_id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "project not found")
+
     cache_key = compute_inputs_hash(
         {"t": principal.tenant_id, "p": req.project_id or "", "q": req.question,
          "ds": sorted(req.dataset_ids)}

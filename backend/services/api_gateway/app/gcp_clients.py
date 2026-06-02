@@ -32,7 +32,12 @@ def bigquery_client() -> "bigquery.Client":
 
     from services.api_gateway.app.settings import get_settings
 
-    return bigquery.Client(project=get_settings().gcp_project)
+    settings = get_settings()
+    # SEC M4 / cost guardrail: cap bytes billed on EVERY query job in one place,
+    # so a runaway/abusive query can't blow the $5/mo budget. Jobs exceeding the
+    # cap fail fast instead of scanning (and billing) unbounded bytes.
+    default_cfg = bigquery.QueryJobConfig(maximum_bytes_billed=settings.bq_max_bytes_billed)
+    return bigquery.Client(project=settings.gcp_project, default_query_job_config=default_cfg)
 
 
 @lru_cache(maxsize=1)

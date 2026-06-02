@@ -46,30 +46,36 @@ def build_profile_query(table_fqn: str, columns: list[tuple[str, str]]) -> str:
     if not columns:
         raise ValueError("profile query needs at least one column")
 
+    from services.api_gateway.app.sql_safety import quote_bq_identifier
+
+    tbl = quote_bq_identifier(table_fqn)
     parts: list[str] = ["COUNT(*) AS __total_rows"]
     for name, bq_type in columns:
         safe = _safe_alias(name)
-        parts.append(f"COUNTIF(`{name}` IS NULL) AS nulls_{safe}")
-        parts.append(f"APPROX_COUNT_DISTINCT(`{name}`) AS distinct_{safe}")
+        col = quote_bq_identifier(name)  # SEC C1: escape attacker-controlled names
+        parts.append(f"COUNTIF({col} IS NULL) AS nulls_{safe}")
+        parts.append(f"APPROX_COUNT_DISTINCT({col}) AS distinct_{safe}")
         # min/max only for orderable types; for the rest, use ANY_VALUE
         if bq_type.upper() in {
             "INT64", "INTEGER", "NUMERIC", "BIGNUMERIC", "FLOAT64", "FLOAT",
             "DATE", "TIME", "DATETIME", "TIMESTAMP", "STRING",
         }:
-            parts.append(f"CAST(MIN(`{name}`) AS STRING) AS min_{safe}")
-            parts.append(f"CAST(MAX(`{name}`) AS STRING) AS max_{safe}")
+            parts.append(f"CAST(MIN({col}) AS STRING) AS min_{safe}")
+            parts.append(f"CAST(MAX({col}) AS STRING) AS max_{safe}")
         else:
-            parts.append(f"CAST(ANY_VALUE(`{name}`) AS STRING) AS min_{safe}")
-            parts.append(f"CAST(ANY_VALUE(`{name}`) AS STRING) AS max_{safe}")
+            parts.append(f"CAST(ANY_VALUE({col}) AS STRING) AS min_{safe}")
+            parts.append(f"CAST(ANY_VALUE({col}) AS STRING) AS max_{safe}")
 
     select = ", ".join(parts)
-    return f"SELECT {select} FROM `{table_fqn}`"
+    return f"SELECT {select} FROM {tbl}"
 
 
 def build_sample_query(table_fqn: str, columns: list[str], n: int = 5) -> str:
     """Sample query — pulls N rows for sample_values."""
-    col_list = ", ".join(f"`{c}`" for c in columns)
-    return f"SELECT {col_list} FROM `{table_fqn}` LIMIT {int(n)}"
+    from services.api_gateway.app.sql_safety import quote_bq_identifier
+
+    col_list = ", ".join(quote_bq_identifier(c) for c in columns)
+    return f"SELECT {col_list} FROM {quote_bq_identifier(table_fqn)} LIMIT {int(n)}"
 
 
 def parse_profile_row(

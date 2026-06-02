@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     bq_raw_dataset: str = Field(default="raw", alias="INSNAV_BQ_RAW_DATASET")
     """BigQuery dataset that holds raw_<id> tables (L0 landing per PRD)."""
 
+    # SEC M4 / $5 guardrail: hard ceiling on bytes billed per query job. Bounds the
+    # cost of any single profiler/edge/normalize query (10 GB ≈ $0.05 at $5/TB).
+    bq_max_bytes_billed: int = Field(
+        default=10 * 1024 * 1024 * 1024, alias="INSNAV_BQ_MAX_BYTES_BILLED"
+    )
+
     # Firestore collection name for dataset metadata
     fs_datasets_collection: str = Field(
         default="datasets", alias="INSNAV_FS_DATASETS_COLLECTION"
@@ -53,7 +59,10 @@ class Settings(BaseSettings):
     cube_api_url: str = Field(default="", alias="INSNAV_CUBE_API_URL")
     # Shared secret used to sign Cube API tokens (matches Cube's CUBEJS_API_SECRET).
     # Read from Secret Manager in prod; falls back to a dev value offline.
-    cube_api_secret: str = Field(default="dev-cube-secret-change-me", alias="INSNAV_CUBE_API_SECRET")
+    # No baked-in default (SEC H3): a known default would let anyone mint a Cube
+    # token for any tenant. Empty offline (Cube is stubbed); set from Secret
+    # Manager in prod.
+    cube_api_secret: str = Field(default="", alias="INSNAV_CUBE_API_SECRET")
 
     # --- Firebase Auth / Identity Platform (Phase 1.5) ---
     # Project that issues Firebase ID tokens. Empty → falls back to gcp_project.

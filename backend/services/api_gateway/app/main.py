@@ -50,7 +50,10 @@ _settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_settings.cors_origins.split(","),
-    allow_credentials=True,
+    # SEC M1: this is a bearer-token API (no cookies), so credentialed CORS is
+    # not needed. Disabling it avoids the wildcard-origin + credentials hazard
+    # (a reflected "*" with credentials lets any site make authenticated calls).
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

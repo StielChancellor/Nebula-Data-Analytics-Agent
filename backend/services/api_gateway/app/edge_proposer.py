@@ -188,12 +188,16 @@ def build_overlap_sql(new_table: str, new_column: str, peer_table: str, peer_col
 
     Uses CAST to STRING so we can compare across slightly-different inferred
     types (BQ autodetect may give one side INT64 and the other STRING for the
-    same logical key).
+    same logical key). SEC C1: identifiers quoted+escaped.
     """
+    from services.api_gateway.app.sql_safety import quote_bq_identifier
+
+    nc, pc = quote_bq_identifier(new_column), quote_bq_identifier(peer_column)
+    nt, pt = quote_bq_identifier(new_table), quote_bq_identifier(peer_table)
     return f"""
 WITH
-  a AS (SELECT DISTINCT CAST(`{new_column}` AS STRING) AS v FROM `{new_table}` WHERE `{new_column}` IS NOT NULL),
-  b AS (SELECT DISTINCT CAST(`{peer_column}` AS STRING) AS v FROM `{peer_table}` WHERE `{peer_column}` IS NOT NULL),
+  a AS (SELECT DISTINCT CAST({nc} AS STRING) AS v FROM {nt} WHERE {nc} IS NOT NULL),
+  b AS (SELECT DISTINCT CAST({pc} AS STRING) AS v FROM {pt} WHERE {pc} IS NOT NULL),
   shared AS (SELECT a.v FROM a INNER JOIN b USING (v)),
   counts AS (
     SELECT

@@ -13,7 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from services.api_gateway.app.auth import Principal, current_principal
+from services.api_gateway.app.auth import Principal, current_principal, require_admin
 from services.api_gateway.app.projects import (
     LocaleHint,
     Project,
@@ -91,7 +91,7 @@ def get_one(
 def update_project(
     project_id: str,
     req: UpdateProjectRequest,
-    principal: Annotated[Principal, Depends(current_principal)],
+    principal: Annotated[Principal, Depends(require_admin)],  # SEC H1
 ) -> Project:
     p = _owned_or_404(project_id, principal)
     if req.name is not None:
@@ -109,7 +109,7 @@ def update_project(
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
     project_id: str,
-    principal: Annotated[Principal, Depends(current_principal)],
+    principal: Annotated[Principal, Depends(require_admin)],  # SEC H1
 ) -> None:
     p = get_project(project_id)
     if p is None or p.tenant_id != principal.tenant_id:

@@ -38,20 +38,27 @@ logger = logging.getLogger(__name__)
 
 # ----- config -----
 
-_DEV_FALLBACK_SECRET = "insnav-dev-only-do-not-use-in-prod-" + "x" * 16  # >= 32 bytes
-
-
 def _jwt_secret() -> str:
+    """
+    HS256 signing secret for bootstrap tokens. Fail-closed (SEC C2): refuse to
+    operate with no secret in a live deploy — never fall back to a baked-in
+    constant (which would make admin tokens forgeable). Offline/test mode uses a
+    deterministic secret that is unreachable in production.
+    """
     s = os.getenv("INSNAV_JWT_SECRET")
-    if not s:
-        logger.warning(
-            "INSNAV_JWT_SECRET is not set; using a dev fallback. "
-            "DO NOT deploy this way — set the env var from Secret Manager."
-        )
-        return _DEV_FALLBACK_SECRET
-    if len(s) < 32:
-        raise RuntimeError("INSNAV_JWT_SECRET must be >= 32 bytes for HS256 security")
-    return s
+    if s:
+        if len(s) < 32:
+            raise RuntimeError("INSNAV_JWT_SECRET must be >= 32 bytes for HS256 security")
+        return s
+
+    from services.api_gateway.app.settings import get_settings
+
+    if get_settings().offline_mode:
+        return "offline-test-jwt-secret-" + "x" * 24  # tests only; never reached in prod
+    raise RuntimeError(
+        "INSNAV_JWT_SECRET is required (set it from Secret Manager). "
+        "Refusing to verify/issue tokens with no signing secret."
+    )
 
 
 _JWT_ALGO = "HS256"
@@ -223,3 +230,17 @@ def current_principal(
     if creds is None or creds.scheme.lower() != "bearer":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
     return decode_token(creds.credentials)
+
+
+def require_admin(
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> Principal:
+    """
+    Dependency for governance/admin endpoints (SEC H1 — RBAC). 403 unless the
+    caller carries the 'admin' role. Edge approval, cube publish, project
+    mutation, and dataset deletion all gate on this so a plain 'user' member
+    cannot alter the governed model or destroy data.
+    """
+    if "admin" not in principal.roles:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin role required")
+    return principal

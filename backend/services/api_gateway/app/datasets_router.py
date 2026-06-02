@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from services.api_gateway.app.auth import Principal, current_principal
+from services.api_gateway.app.auth import Principal, current_principal, require_admin
 from services.api_gateway.app.datasets import (
     Dataset,
     get_dataset as fs_get_dataset,
@@ -85,7 +85,7 @@ def get_dataset(
 @router.delete("/v1/datasets/{dataset_id}", response_model=DeleteDatasetResponse)
 def delete_dataset(
     dataset_id: str,
-    principal: Annotated[Principal, Depends(current_principal)],
+    principal: Annotated[Principal, Depends(require_admin)],  # SEC H1
 ) -> DeleteDatasetResponse:
     """
     Fully delete a dataset: graph edges, BQ raw table, GCS blob, Firestore doc
