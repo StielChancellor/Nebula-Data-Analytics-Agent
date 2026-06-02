@@ -90,6 +90,34 @@ class TestStartUpload:
         assert rows[0]["locale_hint"] == "IN"
         assert rows[0]["label"] == "sales.csv"
 
+    def test_upload_into_project_associates_and_inherits_locale(self, client: TestClient) -> None:
+        h = _auth_headers(client)
+        pid = client.post(
+            "/v1/projects", headers=h, json={"name": "Marriott", "locale_default": "IN"}
+        ).json()["id"]
+        start = client.post(
+            "/v1/uploads/start",
+            headers=h,
+            json={"filename": "txns.csv", "size_bytes": 1000, "project_id": pid},
+        )
+        assert start.status_code == 200, start.text
+        ds_id = start.json()["dataset_id"]
+        # dataset carries project_id + inherited IN locale (no explicit locale_hint given)
+        ds = client.get(f"/v1/datasets/{ds_id}", headers=h).json()
+        assert ds["project_id"] == pid
+        assert ds["locale_hint"] == "IN"
+        # project now lists the dataset
+        proj = client.get(f"/v1/projects/{pid}", headers=h).json()
+        assert ds_id in proj["dataset_ids"]
+
+    def test_upload_into_unknown_project_404s(self, client: TestClient) -> None:
+        r = client.post(
+            "/v1/uploads/start",
+            headers=_auth_headers(client),
+            json={"filename": "x.csv", "size_bytes": 10, "project_id": "nope"},
+        )
+        assert r.status_code == 404
+
 
 class TestCompleteUpload:
     def test_runs_load_then_profile_then_marks_ready(self, client: TestClient) -> None:

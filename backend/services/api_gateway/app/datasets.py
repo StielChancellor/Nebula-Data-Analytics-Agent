@@ -56,6 +56,9 @@ class Dataset(BaseModel):
 
     id: str
     tenant_id: str
+    # Project workspace this dataset belongs to (Phase 10). None = unassigned
+    # (legacy datasets predating projects; the migration assigns a Default project).
+    project_id: str | None = None
     brand: str
     label: str                        # human-friendly name (defaults to original filename)
     locale_hint: Literal["US", "IN"] = "US"
@@ -170,6 +173,35 @@ def list_datasets_for_tenant(tenant_id: str) -> list[Dataset]:
         firestore_client()
         .collection(get_settings().fs_datasets_collection)
         .where(filter=FieldFilter("tenant_id", "==", tenant_id))
+        .stream()
+    )
+    out: list[Dataset] = []
+    for doc in docs:
+        data = doc.to_dict()
+        if data:
+            out.append(Dataset(**data))
+    return out
+
+
+def list_datasets_for_project(tenant_id: str, project_id: str) -> list[Dataset]:
+    """Datasets belonging to a specific project workspace (Phase 10)."""
+    if _offline():
+        return [
+            Dataset(**d)
+            for d in _OFFLINE_DATASETS.values()
+            if d.get("tenant_id") == tenant_id and d.get("project_id") == project_id
+        ]
+
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
+    from services.api_gateway.app.gcp_clients import firestore_client
+    from services.api_gateway.app.settings import get_settings
+
+    docs = (
+        firestore_client()
+        .collection(get_settings().fs_datasets_collection)
+        .where(filter=FieldFilter("tenant_id", "==", tenant_id))
+        .where(filter=FieldFilter("project_id", "==", project_id))
         .stream()
     )
     out: list[Dataset] = []

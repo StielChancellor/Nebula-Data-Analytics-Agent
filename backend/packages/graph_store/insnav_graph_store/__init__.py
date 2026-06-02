@@ -23,6 +23,8 @@ from .models import EdgeState, GraphEdge
 from .store import (
     GraphStore,
     approve_edge,
+    delete_edge,
+    delete_edges_for_dataset,
     list_approved_edges,
     list_proposed_edges,
     propose_edge,
@@ -37,6 +39,8 @@ __all__ = [
     "approve_edge",
     "reject_edge",
     "propose_edge",
+    "delete_edge",
+    "delete_edges_for_dataset",
     "list_approved_edges",
     "list_proposed_edges",
     "reset_offline_store",

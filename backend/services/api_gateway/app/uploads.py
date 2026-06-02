@@ -56,7 +56,11 @@ class StartUploadRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     size_bytes: int = Field(ge=0)
     label: str | None = None
-    locale_hint: str = Field(default="US", pattern="^(US|IN)$")
+    # Project workspace this upload belongs to (Phase 10). When set, the dataset
+    # is scoped to the project and inherits the project's default locale unless
+    # locale_hint is given explicitly.
+    project_id: str | None = None
+    locale_hint: str | None = Field(default=None, pattern="^(US|IN)$")
 
 
 class StartUploadResponse(BaseModel):
@@ -101,6 +105,19 @@ def start_upload(
             f"file too large: max {settings.upload_max_bytes} bytes",
         )
 
+    # Resolve the project workspace (Phase 10). If a project is named, it must
+    # belong to the caller's tenant; the dataset inherits the project's locale
+    # unless the request overrides it explicitly.
+    locale_hint = req.locale_hint or "US"
+    if req.project_id is not None:
+        from services.api_gateway.app.projects import get_project
+
+        project = get_project(req.project_id)
+        if project is None or project.tenant_id != principal.tenant_id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "project not found")
+        if req.locale_hint is None:
+            locale_hint = project.locale_default
+
     dataset_id = new_dataset_id()
     blob_path = gcs_blob_path(dataset_id, req.filename)
 
@@ -122,15 +139,22 @@ def start_upload(
     ds = Dataset(
         id=dataset_id,
         tenant_id=principal.tenant_id,
+        project_id=req.project_id,
         brand=principal.brand,
         label=req.label or req.filename,
-        locale_hint=req.locale_hint,  # type: ignore[arg-type]
+        locale_hint=locale_hint,  # type: ignore[arg-type]
         source_filename=req.filename,
         source_size_bytes=req.size_bytes,
         gcs_blob_path=f"gs://{settings.staging_bucket}/{blob_path}",
         status="queued",
     )
     save_dataset(ds)
+
+    # Associate the dataset with its project workspace (idempotent).
+    if req.project_id is not None:
+        from services.api_gateway.app.projects import add_dataset_to_project
+
+        add_dataset_to_project(req.project_id, dataset_id)
 
     return StartUploadResponse(
         dataset_id=dataset_id,

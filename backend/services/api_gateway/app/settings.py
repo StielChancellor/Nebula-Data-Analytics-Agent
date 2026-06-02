@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     fs_datasets_collection: str = Field(
         default="datasets", alias="INSNAV_FS_DATASETS_COLLECTION"
     )
+    # Firestore collection for project workspaces (Phase 10). A project groups
+    # datasets + graph + cube model + locale + onboarding under one tenant.
+    fs_projects_collection: str = Field(
+        default="projects", alias="INSNAV_FS_PROJECTS_COLLECTION"
+    )
+    # Firestore collection for agent-led ingestion/onboarding sessions (Phase 10).
+    fs_ingest_sessions_collection: str = Field(
+        default="ingest_sessions", alias="INSNAV_FS_INGEST_SESSIONS_COLLECTION"
+    )
 
     # --- Cube (Phase 5b) ---
     # Where generated Cube .js schemas are written for the Cube container to read.
