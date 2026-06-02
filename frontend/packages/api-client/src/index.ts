@@ -206,6 +206,14 @@ export class ApiClient {
     return this.del(`/v1/projects/${id}`).then(() => undefined);
   }
 
+  // --- Pivot (Phase 7) ---
+  getPivotFields(projectId: string): Promise<PivotFields> {
+    return this.get(`/v1/pivot/fields?project_id=${encodeURIComponent(projectId)}`);
+  }
+  pivotQuery(req: PivotQueryRequest): Promise<PivotResult> {
+    return this.post("/v1/pivot/query", req);
+  }
+
   // --- Agent-led onboarding (Phase 10) ---
   startIngestSession(datasetId: string, llm?: string): Promise<SessionResponse> {
     return this.post("/v1/ingest/sessions", { dataset_id: datasetId, llm });
@@ -560,4 +568,36 @@ export interface DeleteDatasetResult {
   gcs_blob: boolean;
   firestore: boolean;
   cube_resynced: boolean;
+}
+
+// ===================== Phase 7: Pivot =====================
+
+export interface PivotField {
+  name: string;
+  title: string;
+  type: string;
+  revenue: boolean;
+}
+
+export interface PivotFields {
+  measures: PivotField[];
+  dimensions: PivotField[];
+  time_dimensions: PivotField[];
+}
+
+export interface PivotQueryRequest {
+  project_id: string;
+  measures?: string[];
+  dimensions?: string[];
+  time_dimension?: string | null;
+  granularity?: string | null;
+  filters?: Array<{ member: string; operator: string; values: string[] }>;
+  order?: Record<string, "asc" | "desc">;
+  limit?: number | null;
+}
+
+export interface PivotResult {
+  columns: string[];
+  rows: unknown[][];
+  cube_query: Record<string, unknown>;
 }

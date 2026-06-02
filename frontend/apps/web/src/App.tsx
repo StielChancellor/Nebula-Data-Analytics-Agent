@@ -17,6 +17,7 @@ import { CubeView } from "./views/CubeView";
 import { ChatView } from "./views/ChatView";
 import { ProjectsView } from "./views/ProjectsView";
 import { OnboardingView } from "./views/OnboardingView";
+import { PivotView } from "./views/PivotView";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
@@ -393,7 +394,7 @@ function ExploreSurface({ project }: { project: Project | null }) {
         </div>
       </div>
       {tab === "ask" && <ChatView projectId={project.id} />}
-      {tab === "pivots" && <ComingSoon label="Pivot tables" />}
+      {tab === "pivots" && <PivotView projectId={project.id} />}
       {tab === "dashboards" && <ComingSoon label="Dashboards" />}
     </div>
   );
