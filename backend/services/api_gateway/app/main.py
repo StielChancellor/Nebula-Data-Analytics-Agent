@@ -88,6 +88,7 @@ class BrandConfig(BaseModel):
 
 
 @app.get("/healthz")
+@app.get("/health")  # alias: Google's Front End shadows /healthz on *.run.app
 def healthz() -> dict[str, str]:
     return {"status": "ok", "service": "api_gateway", "version": app.version}
 

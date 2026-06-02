@@ -127,3 +127,49 @@ class TestSnapshotRouter:
         r = client.post("/v1/snapshots", headers=_auth(client),
                         json={"project_id": "nope", "spec": {"measures": []}})
         assert r.status_code == 404
+
+
+class TestFirestoreRowsSerialization:
+    """Regression: Firestore rejects nested arrays (list-of-lists), so captured
+    rows must be JSON-serialized on write and parsed back on read."""
+
+    def test_rows_roundtrip_via_fake_firestore(self, monkeypatch) -> None:
+        from services.api_gateway.app import gcp_clients
+        from services.api_gateway.app import snapshots as snap_mod
+
+        class _Doc:
+            def __init__(self, store, key):
+                self.store, self.key = store, key
+
+            def set(self, payload):
+                self.store[self.key] = payload
+
+            def get(self):
+                d = self.store.get(self.key)
+                return type("M", (), {"exists": d is not None, "to_dict": lambda self=None, d=d: d})()
+
+        class _Col:
+            def __init__(self, store):
+                self.store = store
+
+            def document(self, key):
+                return _Doc(self.store, key)
+
+        class _Fs:
+            def __init__(self):
+                self.store = {}
+
+            def collection(self, _name):
+                return _Col(self.store)
+
+        fake = _Fs()
+        monkeypatch.setattr(snap_mod, "_offline", lambda: False)
+        monkeypatch.setattr(gcp_clients, "firestore_client", lambda: fake)
+
+        s = snap_mod.Snapshot(tenant_id="t", project_id="p", spec={"measures": ["m"]},
+                              columns=["a", "b"], rows=[["x", 1], ["y", 2]])
+        snap_mod.save_snapshot(s)
+        # Stored as a JSON string (Firestore-safe), not a raw nested array.
+        assert isinstance(fake.store[s.id]["rows"], str)
+        got = snap_mod.get_snapshot(s.id)
+        assert got is not None and got.rows == [["x", 1], ["y", 2]]

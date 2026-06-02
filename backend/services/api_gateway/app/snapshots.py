@@ -15,6 +15,7 @@ Firestore layout: /snapshots/{id}. Mirrors dashboards.py (dual offline backend).
 from __future__ import annotations
 
 import datetime as dt
+import json
 from typing import Any
 from uuid import uuid4
 
@@ -161,6 +162,9 @@ def save_snapshot(s: Snapshot) -> None:
         return
     from services.api_gateway.app.gcp_clients import firestore_client
 
+    # Firestore rejects nested arrays (list-of-lists), so serialize the captured
+    # rows to a JSON string. (Same hazard we hit with dataset row_sample.)
+    payload["rows"] = json.dumps(payload.get("rows") or [])
     firestore_client().collection(_col()).document(s.id).set(payload)
 
 
@@ -171,7 +175,12 @@ def get_snapshot(snapshot_id: str) -> Snapshot | None:
     from services.api_gateway.app.gcp_clients import firestore_client
 
     doc = firestore_client().collection(_col()).document(snapshot_id).get()
-    return Snapshot(**doc.to_dict()) if doc.exists else None
+    if not doc.exists:
+        return None
+    data = doc.to_dict() or {}
+    if isinstance(data.get("rows"), str):
+        data["rows"] = json.loads(data["rows"])
+    return Snapshot(**data)
 
 
 def list_snapshots_for_project(tenant_id: str, project_id: str) -> list[Snapshot]:
@@ -192,7 +201,15 @@ def list_snapshots_for_project(tenant_id: str, project_id: str) -> list[Snapshot
         .where(filter=FieldFilter("project_id", "==", project_id))
         .stream()
     )
-    return [Snapshot(**(d.to_dict() or {})) for d in docs if d.to_dict()]
+    out: list[Snapshot] = []
+    for d in docs:
+        data = d.to_dict()
+        if not data:
+            continue
+        if isinstance(data.get("rows"), str):
+            data["rows"] = json.loads(data["rows"])
+        out.append(Snapshot(**data))
+    return out
 
 
 def delete_snapshot_record(snapshot_id: str) -> None:
