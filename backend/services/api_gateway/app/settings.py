@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     bq_max_bytes_billed: int = Field(
         default=10 * 1024 * 1024 * 1024, alias="INSNAV_BQ_MAX_BYTES_BILLED"
     )
+    # Phase 11 #4 cost preview: above this estimated scan size (GB) the UI warns
+    # and asks the user to approve before running a (potentially pricey) query.
+    bq_cost_preview_gb_threshold: float = Field(
+        default=5.0, alias="INSNAV_BQ_COST_PREVIEW_GB_THRESHOLD"
+    )
 
     # Firestore collection name for dataset metadata
     fs_datasets_collection: str = Field(
@@ -49,6 +54,14 @@ class Settings(BaseSettings):
     # Firestore collection for pinnable dashboards (Phase 8).
     fs_dashboards_collection: str = Field(
         default="dashboards", alias="INSNAV_FS_DASHBOARDS_COLLECTION"
+    )
+    # Cohort segments (Phase 11 #2) — named saved filter-sets per project.
+    fs_segments_collection: str = Field(
+        default="segments", alias="INSNAV_FS_SEGMENTS_COLLECTION"
+    )
+    # Result snapshots (Phase 11 #3) — captured query results for diffing.
+    fs_snapshots_collection: str = Field(
+        default="snapshots", alias="INSNAV_FS_SNAPSHOTS_COLLECTION"
     )
 
     # --- Cube (Phase 5b) ---

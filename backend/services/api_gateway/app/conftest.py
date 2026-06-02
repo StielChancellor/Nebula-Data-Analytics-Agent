@@ -16,7 +16,7 @@ def _reset_all_offline_stores() -> None:
     """Wipe every in-memory store so tests are isolated (Phase 10 added more)."""
     datasets.reset_offline_store()
     projects.reset_offline_store()
-    for mod in ("ingest_router", "dashboards"):
+    for mod in ("ingest_router", "dashboards", "cohorts", "snapshots"):
         try:
             __import__(f"services.api_gateway.app.{mod}", fromlist=["reset_offline_store"]).reset_offline_store()
         except Exception:  # noqa: BLE001

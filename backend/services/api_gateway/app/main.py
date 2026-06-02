@@ -28,13 +28,18 @@ from services.api_gateway.app.auth import (
     issue_token,
 )
 from services.api_gateway.app.chat_router import router as chat_router
+from services.api_gateway.app.cohorts_router import router as cohorts_router
 from services.api_gateway.app.cube_router import router as cube_router
 from services.api_gateway.app.dashboards_router import router as dashboards_router
 from services.api_gateway.app.datasets_router import router as datasets_router
 from services.api_gateway.app.edges_router import router as edges_router
 from services.api_gateway.app.ingest_router import router as ingest_router
+from services.api_gateway.app.lineage_router import router as lineage_router
+from services.api_gateway.app.metrics_router import router as metrics_router
+from services.api_gateway.app.notebook_router import router as notebook_router
 from services.api_gateway.app.pivot_router import router as pivot_router
 from services.api_gateway.app.projects_router import router as projects_router
+from services.api_gateway.app.snapshots_router import router as snapshots_router
 from services.api_gateway.app.settings import get_settings
 from services.api_gateway.app.uploads import router as uploads_router
 
@@ -145,3 +150,8 @@ app.include_router(projects_router)
 app.include_router(ingest_router)
 app.include_router(pivot_router)
 app.include_router(dashboards_router)
+app.include_router(lineage_router)
+app.include_router(metrics_router)
+app.include_router(notebook_router)
+app.include_router(cohorts_router)
+app.include_router(snapshots_router)

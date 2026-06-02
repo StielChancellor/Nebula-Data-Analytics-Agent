@@ -51,6 +51,16 @@ class PivotResult(BaseModel):
     cube_query: dict[str, Any]
 
 
+class CostEstimate(BaseModel):
+    estimated_bytes: int
+    estimated_gb: float
+    estimated_usd: float
+    threshold_gb: float
+    exceeds_threshold: bool
+    per_cube: list[dict[str, Any]] = Field(default_factory=list)
+    method: str
+
+
 def _project_or_404(principal: Principal, project_id: str) -> None:
     from services.api_gateway.app.projects import get_project
 
@@ -108,3 +118,24 @@ def pivot_query(
     except UnknownField as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     return PivotResult(columns=columns, rows=rows, cube_query=query)
+
+
+@router.post("/estimate", response_model=CostEstimate)
+def pivot_estimate(
+    req: PivotQueryRequest,
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> CostEstimate:
+    """Cost preview (Phase 11 #4) — estimate scan size before running so the UI
+    can gate a pricey query on user approval. $0: derived from table metadata."""
+    _project_or_404(principal, req.project_id)
+    from services.api_gateway.app.cube_query_service import UnknownField, estimate_spec
+
+    try:
+        est = estimate_spec(
+            tenant_id=principal.tenant_id, project_id=req.project_id,
+            measures=req.measures, dimensions=req.dimensions,
+            time_dimension=req.time_dimension, filters=req.filters,
+        )
+    except UnknownField as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
+    return CostEstimate(**est)
