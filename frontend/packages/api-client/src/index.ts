@@ -218,12 +218,12 @@ export class ApiClient {
   }
 
   // --- Edges ---
-  listApprovedEdges(): Promise<GraphEdge[]> {
-    return this.get("/v1/edges");
+  listApprovedEdges(projectId?: string): Promise<GraphEdge[]> {
+    return this.get(`/v1/edges${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`);
   }
 
-  listEdgeProposals(): Promise<GraphEdge[]> {
-    return this.get("/v1/edges/proposals");
+  listEdgeProposals(projectId?: string): Promise<GraphEdge[]> {
+    return this.get(`/v1/edges/proposals${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`);
   }
 
   approveEdge(id: string): Promise<GraphEdge> {
@@ -239,8 +239,8 @@ export class ApiClient {
   }
 
   // --- Cube schemas (Phase 5) ---
-  listCubeSchemas(): Promise<CubeSchemaSummary[]> {
-    return this.get("/v1/cube/schemas");
+  listCubeSchemas(projectId?: string): Promise<CubeSchemaSummary[]> {
+    return this.get(`/v1/cube/schemas${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`);
   }
 
   getCubeSchemaJson(datasetId: string): Promise<CubeSchemaFull> {
@@ -257,9 +257,9 @@ export class ApiClient {
     return res.text();
   }
 
-  /** Publish the tenant's Cube model to GCS for the deployed Cube service. */
-  syncCubeModel(): Promise<CubeSyncResult> {
-    return this.post("/v1/cube/sync", {});
+  /** Publish a project's (or the tenant's) Cube model to GCS for the Cube service. */
+  syncCubeModel(projectId?: string): Promise<CubeSyncResult> {
+    return this.post(`/v1/cube/sync${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`, {});
   }
 
   /** Ask the agent swarm a natural-language question, scoped to a project. */

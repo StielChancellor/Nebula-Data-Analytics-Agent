@@ -21,7 +21,7 @@ import { KnowledgeGraphVisualization } from "./KnowledgeGraphVisualization";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
-export function GraphView() {
+export function GraphView({ projectId }: { projectId?: string } = {}) {
   const auth = useAuth();
   const client = useMemo(
     () => new ApiClient({ baseUrl: API_BASE, getToken: auth.getToken }),
@@ -43,9 +43,9 @@ export function GraphView() {
   const refresh = useCallback(async () => {
     try {
       const [p, a, ds] = await Promise.all([
-        client.listEdgeProposals(),
-        client.listApprovedEdges(),
-        client.listDatasets(),
+        client.listEdgeProposals(projectId),
+        client.listApprovedEdges(projectId),
+        client.listDatasets(projectId),
       ]);
       setProposed(p);
       setApproved(a);
@@ -54,7 +54,7 @@ export function GraphView() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [client]);
+  }, [client, projectId]);
 
   useEffect(() => {
     void refresh();

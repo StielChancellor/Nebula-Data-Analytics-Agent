@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BrandConfig } from "@insnav/brand-runtime";
 import { useAuth, LoginScreen } from "@insnav/auth";
-import { ApiClient, type Project } from "@insnav/api-client";
+import { ApiClient, type Project, type ProjectStatus } from "@insnav/api-client";
 import { DatasetsView } from "./views/DatasetsView";
 import { GraphView } from "./views/GraphView";
 import { CubeView } from "./views/CubeView";
@@ -233,22 +233,103 @@ function ProjectWorkspace({ project, onBack }: { project: Project; onBack: () =>
           </div>
         )
       )}
-      {tab === "graph" && <GraphView />}
-      {tab === "cube" && <CubeView />}
-      {tab === "settings" && <ProjectSettings project={project} />}
+      {tab === "graph" && <GraphView projectId={project.id} />}
+      {tab === "cube" && <CubeView projectId={project.id} />}
+      {tab === "settings" && <ProjectSettings project={project} onChanged={onBack} />}
     </div>
   );
 }
 
-function ProjectSettings({ project }: { project: Project }) {
+function ProjectSettings({ project, onChanged }: { project: Project; onChanged: () => void }) {
+  const auth = useAuth();
+  const client = useMemo(
+    () => new ApiClient({ baseUrl: API_BASE, getToken: auth.getToken }),
+    [auth.getToken],
+  );
+  const [name, setName] = useState(project.name);
+  const [status, setStatus] = useState<ProjectStatus>(project.status);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await client.updateProject(project.id, { name: name.trim(), status });
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (
+      !window.confirm(
+        `Delete project “${project.name}”? This permanently deletes its ${project.dataset_ids.length} dataset(s) — BigQuery tables, files, graph edges, and cube — and cannot be undone.`,
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      await client.deleteProject(project.id);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="space-y-3 text-[13px]">
+    <div className="space-y-4 text-[13px] max-w-lg">
       <h3 className="text-sm font-semibold">Settings</h3>
+
+      {error && (
+        <div className="text-[12px] text-red-300 border border-red-900/60 bg-red-950/40 rounded px-2 py-1">
+          {error}
+        </div>
+      )}
+
+      <div className="border border-ink-700/60 rounded-lg bg-ink-800/40 p-4 space-y-3">
+        <label className="block text-[11px] text-ink-300">
+          Name
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mt-1 w-full bg-ink-900 border border-ink-700/60 rounded px-3 py-2 text-sm text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </label>
+        <label className="block text-[11px] text-ink-300">
+          Status
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as ProjectStatus)}
+            className="mt-1 block bg-ink-900 border border-ink-700/60 rounded px-2 py-2 text-[12px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="draft">draft</option>
+            <option value="active">active</option>
+            <option value="archived">archived</option>
+          </select>
+        </label>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={save}
+            disabled={busy || !name.trim()}
+            className="text-[12px] px-4 py-2 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {busy ? "Saving…" : "Save"}
+          </button>
+          {saved && <span className="text-[12px] text-emerald-300">Saved ✓</span>}
+        </div>
+      </div>
+
       <dl className="border border-ink-700/60 rounded-lg bg-ink-800/40 divide-y divide-ink-700/40">
         {[
-          ["Name", project.name],
           ["Locale", project.locale_default],
-          ["Status", project.status],
           ["Owner", project.owner_email],
           ["Members", `${project.members.length}`],
           ["Datasets", `${project.dataset_ids.length}`],
@@ -259,10 +340,23 @@ function ProjectSettings({ project }: { project: Project }) {
           </div>
         ))}
       </dl>
-      <p className="text-[11px] text-ink-400">
-        Member invitations require user accounts (Identity Platform) — a later add. The project
-        owner manages it for now.
+      <p className="text-[11px] text-ink-300">
+        Member invitations require user accounts (Identity Platform) — a later add.
       </p>
+
+      <div className="border border-red-900/50 rounded-lg p-4">
+        <div className="text-[12px] text-red-300 font-semibold mb-1">Danger zone</div>
+        <p className="text-[11px] text-ink-300 mb-2">
+          Deleting a project removes all its datasets, graph, and cube. This can't be undone.
+        </p>
+        <button
+          onClick={remove}
+          disabled={busy}
+          className="text-[12px] px-3 py-1.5 rounded border border-red-900/60 text-red-300 hover:bg-red-950/40 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Delete project
+        </button>
+      </div>
     </div>
   );
 }
@@ -308,7 +402,7 @@ function ExploreSurface({ project }: { project: Project | null }) {
 function ComingSoon({ label }: { label: string }) {
   return (
     <div className="text-[13px] text-ink-300 border border-dashed border-ink-700/60 rounded-lg p-10 bg-ink-800/20 text-center">
-      <div className="text-2xl text-ink-500 mb-2">▦</div>
+      <div className="text-2xl text-ink-300 mb-2">▦</div>
       {label} — coming next (PRD Phase 7/8). Your governed cube already powers <span className="text-ink-100">Ask</span>.
     </div>
   );

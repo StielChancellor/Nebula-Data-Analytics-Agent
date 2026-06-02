@@ -8,11 +8,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@insnav/auth";
 import {
   ApiClient,
+  type ColumnSpec,
   type DatasetListItem,
   type DatasetStatus,
   type RegionCode,
   uploadToGcs,
 } from "@insnav/api-client";
+
+const BQ_TYPES = ["STRING", "INT64", "NUMERIC", "FLOAT64", "DATE", "TIMESTAMP", "BOOL"];
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
@@ -31,14 +34,19 @@ export function DatasetsView({ projectId, localeDefault = "US", onOnboard }: Dat
   const [items, setItems] = useState<DatasetListItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
       const list = await client.listDatasets(projectId);
       setItems(list);
+      setError(null);
+      setLoaded(true);
     } catch (e) {
-      console.error("listDatasets failed", e);
+      // C5: surface failures instead of silently showing an empty state.
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRefreshing(false);
     }
@@ -74,11 +82,18 @@ export function DatasetsView({ projectId, localeDefault = "US", onOnboard }: Dat
         </div>
       </div>
 
-      {items.length === 0 ? (
-        <EmptyState onUpload={() => setShowUpload(true)} />
-      ) : (
-        <DatasetTable items={items} client={client} onChanged={refresh} onOnboard={onOnboard} />
+      {error && (
+        <div className="text-[12px] text-red-300 border border-red-900/60 bg-red-950/40 rounded px-3 py-2 flex items-center justify-between">
+          <span>Couldn't load datasets: {error}</span>
+          <button onClick={() => void refresh()} className="underline hover:text-red-200">Retry</button>
+        </div>
       )}
+
+      {items.length > 0 ? (
+        <DatasetTable items={items} client={client} onChanged={refresh} onOnboard={onOnboard} />
+      ) : loaded && !error ? (
+        <EmptyState onUpload={() => setShowUpload(true)} />
+      ) : null}
 
       {showUpload && (
         <UploadDialog
@@ -201,7 +216,14 @@ function DatasetTable({
   );
 }
 
-type UploadPhase = "select" | "uploading" | "completing" | "polling" | "done" | "error";
+type UploadPhase = "select" | "uploading" | "preview" | "completing" | "polling" | "done" | "error";
+
+interface PreviewRow {
+  name: string;
+  bq_type: string;
+  source_format: string | null;
+  sample_values: string[];
+}
 
 interface UploadDialogProps {
   client: ApiClient;
@@ -218,6 +240,16 @@ function UploadDialog({ client, projectId, localeDefault = "US", onClose, onUplo
   const [error, setError] = useState<string | null>(null);
   const [datasetId, setDatasetId] = useState<string | null>(null);
   const [status, setStatus] = useState<DatasetStatus | null>(null);
+  const [cols, setCols] = useState<PreviewRow[]>([]);
+
+  // a11y: Escape closes the modal (H5).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const onPickFile = (f: File) => {
     setFile(f);
@@ -226,55 +258,84 @@ function UploadDialog({ client, projectId, localeDefault = "US", onClose, onUplo
     setProgress(0);
   };
 
+  // Step 1+2+preview: start → PUT → read-before-commit sniff. The user reviews
+  // (and can override) the inferred per-column types before the BQ load.
   const onSubmit = async () => {
     if (!file) return;
     setError(null);
     try {
-      // Step 1: start (scoped to the project; locale inherited from it)
       const start = await client.startUpload(file.name, file.size, {
         locale_hint: localeDefault,
         ...(projectId ? { project_id: projectId } : {}),
       });
       setDatasetId(start.dataset_id);
 
-      // Step 2: PUT to GCS with progress
       setPhase("uploading");
-      await uploadToGcs(start.signed_url, file, (loaded, total) => {
-        setProgress(loaded / total);
-      });
+      await uploadToGcs(start.signed_url, file, (loaded, total) => setProgress(loaded / total));
 
-      // Step 3: complete (kicks off BQ load + profile)
+      const pv = await client.previewUpload(start.dataset_id);
+      setCols(
+        pv.columns.map((c) => ({
+          name: c.name,
+          bq_type: c.inferred_bq_type,
+          source_format: c.inferred_format,
+          sample_values: c.sample_values,
+        })),
+      );
+      setPhase("preview");
+    } catch (e) {
+      console.error("upload/preview failed", e);
+      setError(e instanceof Error ? e.message : String(e));
+      setPhase("error");
+    }
+  };
+
+  // Step 3+4: commit the (possibly overridden) schema → load + profile → poll.
+  const confirmLoad = async () => {
+    if (!datasetId) return;
+    setError(null);
+    try {
       setPhase("completing");
-      const done = await client.completeUpload(start.dataset_id);
+      const overrides: ColumnSpec[] = cols.map((c) => ({
+        name: c.name,
+        bq_type: c.bq_type,
+        source_format: c.source_format,
+      }));
+      const done = await client.completeUpload(datasetId, overrides);
       let finalStatus: DatasetStatus = done.status;
       setStatus(finalStatus);
 
-      // Step 4: poll until ready (in the synchronous v1 flow, status will
-      // be "ready" or "failed" immediately, but the loop handles future
-      // async ingestion too)
       setPhase("polling");
       for (let i = 0; i < 60; i += 1) {
-        const cur = await client.getDataset(start.dataset_id);
+        const cur = await client.getDataset(datasetId);
         finalStatus = cur.status;
         setStatus(finalStatus);
         if (finalStatus === "ready" || finalStatus === "failed") break;
         await new Promise((r) => setTimeout(r, 1000));
       }
       setPhase("done");
-      onUploaded(start.dataset_id, finalStatus);
+      onUploaded(datasetId, finalStatus);
     } catch (e) {
-      console.error("upload failed", e);
+      console.error("load failed", e);
       setError(e instanceof Error ? e.message : String(e));
       setPhase("error");
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-ink-900/70 grid place-items-center p-6">
-      <div className="w-full max-w-md border border-ink-700/60 rounded-lg bg-ink-800 p-6 space-y-4">
+    <div
+      className="fixed inset-0 z-50 bg-ink-900/70 grid place-items-center p-6"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="upload-title"
+        className={`w-full ${phase === "preview" ? "max-w-2xl" : "max-w-md"} border border-ink-700/60 rounded-lg bg-ink-800 p-6 space-y-4`}
+      >
         <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">Upload CSV</div>
-          <button onClick={onClose} className="text-ink-300 hover:text-ink-100 text-lg leading-none">×</button>
+          <div id="upload-title" className="text-sm font-semibold">Upload CSV</div>
+          <button onClick={onClose} aria-label="Close" className="text-ink-300 hover:text-ink-100 text-lg leading-none">×</button>
         </div>
 
         {phase === "select" && (
@@ -293,11 +354,59 @@ function UploadDialog({ client, projectId, localeDefault = "US", onClose, onUplo
             <div className="text-[11px] text-ink-300 font-mono">
               {file && `${(file.size / 1024 / 1024).toFixed(1)} MB · ${(progress * 100).toFixed(0)}%`}
             </div>
+            <div className="text-[11px] text-ink-300">First run can take ~30s while the engine warms up…</div>
+          </div>
+        )}
+
+        {phase === "preview" && (
+          <div className="space-y-2">
+            <p className="text-[12px] text-ink-300">
+              Here's what I read. Check the column types — fix any that look wrong (India dates &amp; ₹/lakh
+              amounts are auto-detected), then load.
+            </p>
+            <div className="overflow-auto max-h-72 border border-ink-700/50 rounded">
+              <table className="w-full text-[12px]">
+                <thead className="bg-ink-900/60 text-ink-300 text-[11px] uppercase tracking-wider sticky top-0">
+                  <tr>
+                    <th className="text-left px-2 py-1">Column</th>
+                    <th className="text-left px-2 py-1">Type</th>
+                    <th className="text-left px-2 py-1">Samples</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cols.map((c, i) => (
+                    <tr key={c.name} className="border-t border-ink-700/40">
+                      <td className="px-2 py-1 font-mono text-ink-100">{c.name}</td>
+                      <td className="px-2 py-1">
+                        <select
+                          value={c.bq_type}
+                          aria-label={`Type for ${c.name}`}
+                          onChange={(e) =>
+                            setCols((cs) => cs.map((r, idx) => (idx === i ? { ...r, bq_type: e.target.value } : r)))
+                          }
+                          className="bg-ink-900 border border-ink-700/60 rounded px-1.5 py-1 text-[12px] text-ink-100"
+                        >
+                          {BQ_TYPES.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                        {c.source_format && (
+                          <span className="ml-1 text-[10px] text-ink-300">{c.source_format}</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1 text-ink-300 font-mono truncate max-w-[16rem]">
+                        {c.sample_values.slice(0, 3).join(", ")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {error && (
-          <div className="text-[12px] text-red-400 border border-red-900/60 bg-red-950/40 rounded px-2 py-1">
+          <div className="text-[12px] text-red-300 border border-red-900/60 bg-red-950/40 rounded px-2 py-1">
             {error}
           </div>
         )}
@@ -311,9 +420,22 @@ function UploadDialog({ client, projectId, localeDefault = "US", onClose, onUplo
               <button
                 onClick={onSubmit}
                 disabled={!file}
-                className="text-[12px] px-4 py-1.5 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90 disabled:opacity-50"
+                className="text-[12px] px-4 py-1.5 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Upload
+                Upload &amp; preview
+              </button>
+            </>
+          )}
+          {phase === "preview" && (
+            <>
+              <button onClick={onClose} className="text-[12px] px-3 py-1.5 rounded border border-ink-700/60 hover:bg-ink-700/40">
+                Cancel
+              </button>
+              <button
+                onClick={confirmLoad}
+                className="text-[12px] px-4 py-1.5 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90"
+              >
+                Looks right — load it
               </button>
             </>
           )}

@@ -13,6 +13,7 @@ import {
   type ColumnSemantics,
   type CompletionResult,
   type IngestSession,
+  type InterviewStep,
   type LlmOption,
   type MeasureAgg,
 } from "@insnav/api-client";
@@ -44,7 +45,14 @@ export function OnboardingView({
   const [error, setError] = useState<string | null>(null);
   const [models, setModels] = useState<LlmOption[]>([]);
   const [model, setModel] = useState<string>("");
+  const [checkedEdges, setCheckedEdges] = useState<Record<string, boolean>>({});
   const started = useRef(false);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+
+  // Autoscroll the transcript to the newest turn (M2).
+  useEffect(() => {
+    transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight, behavior: "smooth" });
+  }, [session?.transcript.length]);
 
   useEffect(() => {
     client.listLlmOptions().then((o) => {
@@ -73,7 +81,11 @@ export function OnboardingView({
     }
   };
 
-  const reply = async (body: { answer?: string; semantics_patch?: ColumnSemantics[] }) => {
+  const reply = async (body: {
+    answer?: string;
+    semantics_patch?: ColumnSemantics[];
+    confirmed_edge_ids?: string[];
+  }) => {
     if (!session) return;
     setBusy(true);
     setError(null);
@@ -118,8 +130,11 @@ export function OnboardingView({
         )}
       </header>
 
+      {/* Progress */}
+      {session && !completion && <Stepper step={session.current_step} />}
+
       {/* Transcript */}
-      <div className="space-y-2">
+      <div ref={transcriptRef} className="space-y-2 max-h-80 overflow-y-auto pr-1">
         {session?.transcript.map((t, i) => (
           <div
             key={i}
@@ -161,13 +176,45 @@ export function OnboardingView({
       {/* Current question */}
       {agent && !completion && (
         <div className="border border-ink-700/60 rounded-lg bg-ink-800/40 p-4 space-y-3">
-          {agent.question_type === "draft_review" ? (
-            <DraftReview
-              draft={draft}
-              onEdit={editRow}
-              onAccept={() => reply({ answer: "accept", semantics_patch: draft })}
+          {agent.step === "joins" ? (
+            <JoinsReview
+              edges={(agent.context?.edges as JoinEdge[] | undefined) ?? []}
+              checked={checkedEdges}
+              setChecked={setCheckedEdges}
               busy={busy}
+              onConfirm={() =>
+                reply({
+                  answer: "yes",
+                  confirmed_edge_ids: Object.keys(checkedEdges).filter((k) => checkedEdges[k]),
+                })
+              }
             />
+          ) : agent.question_type === "draft_review" ? (
+            <>
+              <DraftReview
+                draft={draft}
+                onEdit={editRow}
+                onAccept={() => reply({ answer: "accept", semantics_patch: draft })}
+                busy={busy}
+              />
+              <div className="flex items-start gap-2 pt-2 border-t border-ink-700/40">
+                <input
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && text.trim() && void reply({ answer: text.trim() })}
+                  placeholder="Or tell me in words — e.g. “amount is revenue, ignore notes”"
+                  aria-label="Describe a correction"
+                  className="flex-1 bg-ink-900 border border-ink-700/60 rounded px-3 py-2 text-[13px] focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <button
+                  onClick={() => text.trim() && reply({ answer: text.trim() })}
+                  disabled={busy || !text.trim()}
+                  className="text-[12px] px-3 py-2 rounded border border-ink-700/60 text-ink-200 hover:bg-ink-700/40 disabled:opacity-50"
+                >
+                  Apply
+                </button>
+              </div>
+            </>
           ) : agent.question_type === "confirm" ? (
             <div className="flex items-center gap-2">
               <button
@@ -224,7 +271,14 @@ function DraftReview({
 }) {
   return (
     <div className="space-y-3">
-      <div className="overflow-auto">
+      <p className="text-[11px] text-ink-300 leading-relaxed">
+        <span className="text-ink-200 font-medium">Measure</span> = a number you total or average ·{" "}
+        <span className="text-ink-200 font-medium">Dimension</span> = a category you group by ·{" "}
+        <span className="text-ink-200 font-medium">Time</span> = dates ·{" "}
+        <span className="text-ink-200 font-medium">Identifier</span> = a key that links tables ·{" "}
+        <span className="text-ink-200 font-medium">Ignore</span> = leave it out.
+      </p>
+      <div className="overflow-auto max-h-72">
         <table className="w-full text-[12px]">
           <thead className="text-ink-300 text-[11px] uppercase tracking-wider">
             <tr>
@@ -261,7 +315,7 @@ function DraftReview({
                       ))}
                     </select>
                   ) : (
-                    <span className="text-ink-500">—</span>
+                    <span className="text-ink-300">—</span>
                   )}
                 </td>
                 <td className="px-2 py-1">
@@ -273,7 +327,7 @@ function DraftReview({
                       className="accent-accent"
                     />
                   ) : (
-                    <span className="text-ink-500">—</span>
+                    <span className="text-ink-300">—</span>
                   )}
                 </td>
               </tr>
@@ -287,6 +341,127 @@ function DraftReview({
         className="text-[12px] px-4 py-2 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90 disabled:opacity-50"
       >
         {busy ? "Working…" : "Looks good — continue"}
+      </button>
+    </div>
+  );
+}
+
+const STEP_ORDER: InterviewStep[] = ["project_name", "grain", "draft_review", "joins", "confirm"];
+const STEP_LABELS: Record<InterviewStep, string> = {
+  project_name: "Name",
+  grain: "Grain",
+  draft_review: "Columns",
+  joins: "Joins",
+  confirm: "Confirm",
+  done: "Done",
+};
+
+function Stepper({ step }: { step: InterviewStep }) {
+  const idx = STEP_ORDER.indexOf(step);
+  return (
+    <ol className="flex items-center gap-1 text-[11px]" aria-label="Onboarding progress">
+      {STEP_ORDER.map((s, i) => {
+        const state = i < idx ? "done" : i === idx ? "current" : "todo";
+        return (
+          <li key={s} className="flex items-center gap-1">
+            <span
+              className={[
+                "px-2 py-0.5 rounded",
+                state === "current"
+                  ? "bg-accent/20 text-accent-glow font-semibold"
+                  : state === "done"
+                  ? "text-emerald-300"
+                  : "text-ink-300",
+              ].join(" ")}
+              aria-current={state === "current" ? "step" : undefined}
+            >
+              {state === "done" ? "✓ " : ""}{STEP_LABELS[s]}
+            </span>
+            {i < STEP_ORDER.length - 1 && <span className="text-ink-300">›</span>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+interface JoinEdge {
+  id: string;
+  from_dataset: string;
+  from_column: string;
+  to_dataset: string;
+  to_column: string;
+  key_overlap_pct?: number;
+  sample_overlap?: string[];
+}
+
+function JoinsReview({
+  edges,
+  checked,
+  setChecked,
+  onConfirm,
+  busy,
+}: {
+  edges: JoinEdge[];
+  checked: Record<string, boolean>;
+  setChecked: (c: Record<string, boolean>) => void;
+  onConfirm: () => void;
+  busy: boolean;
+}) {
+  if (edges.length === 0) {
+    return (
+      <div className="space-y-3">
+        <p className="text-[12px] text-ink-300">No cross-dataset joins were found for this project.</p>
+        <button
+          onClick={onConfirm}
+          disabled={busy}
+          className="text-[12px] px-4 py-2 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90 disabled:opacity-50"
+        >
+          {busy ? "Working…" : "Continue"}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-[12px] text-ink-300">
+        I found these candidate joins. Tick the ones that are real relationships — only confirmed joins
+        become governed cube joins.
+      </p>
+      <div className="space-y-2">
+        {edges.map((e) => (
+          <label
+            key={e.id}
+            className="flex items-start gap-2 border border-ink-700/50 rounded-lg p-2.5 cursor-pointer hover:border-accent/40"
+          >
+            <input
+              type="checkbox"
+              checked={!!checked[e.id]}
+              onChange={(ev) => setChecked({ ...checked, [e.id]: ev.target.checked })}
+              className="mt-0.5 accent-accent"
+            />
+            <div className="text-[12px]">
+              <div className="font-mono text-ink-100">
+                {e.from_column} ↔ {e.to_column}
+              </div>
+              <div className="text-[11px] text-ink-300">
+                {typeof e.key_overlap_pct === "number"
+                  ? `${Math.round(e.key_overlap_pct * 100)}% key overlap`
+                  : ""}
+                {e.sample_overlap && e.sample_overlap.length > 0
+                  ? ` · e.g. ${e.sample_overlap.slice(0, 3).join(", ")}`
+                  : ""}
+              </div>
+            </div>
+          </label>
+        ))}
+      </div>
+      <button
+        onClick={onConfirm}
+        disabled={busy}
+        className="text-[12px] px-4 py-2 rounded bg-accent text-accent-foreground font-semibold hover:opacity-90 disabled:opacity-50"
+      >
+        {busy ? "Working…" : "Confirm joins"}
       </button>
     </div>
   );

@@ -15,7 +15,7 @@ import { useAuth } from "@insnav/auth";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
-export function CubeView() {
+export function CubeView({ projectId }: { projectId?: string } = {}) {
   const auth = useAuth();
   const client = useMemo(
     () => new ApiClient({ baseUrl: API_BASE, getToken: auth.getToken }),
@@ -32,7 +32,7 @@ export function CubeView() {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const list = await client.listCubeSchemas();
+      const list = await client.listCubeSchemas(projectId);
       setItems(list);
       setError(null);
     } catch (e) {
@@ -40,13 +40,13 @@ export function CubeView() {
     } finally {
       setRefreshing(false);
     }
-  }, [client]);
+  }, [client, projectId]);
 
   const publish = useCallback(async () => {
     setPublishing(true);
     setPublishMsg(null);
     try {
-      const r = await client.syncCubeModel();
+      const r = await client.syncCubeModel(projectId);
       setPublishMsg(`Published ${r.file_count} cube(s) · version ${r.version.slice(0, 12)}`);
       setError(null);
     } catch (e) {
@@ -54,7 +54,7 @@ export function CubeView() {
     } finally {
       setPublishing(false);
     }
-  }, [client]);
+  }, [client, projectId]);
 
   useEffect(() => {
     void refresh();
