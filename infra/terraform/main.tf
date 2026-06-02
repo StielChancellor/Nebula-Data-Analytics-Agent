@@ -208,8 +208,8 @@ resource "google_project_iam_member" "api_gateway" {
     "roles/datastore.user",               # Firestore reads for /v1/me/*
     "roles/secretmanager.secretAccessor", # JWT secret + cube API secret
     "roles/storage.objectUser",           # write/prune the Cube model in GCS (Phase 5b sync)
-    "roles/bigquery.dataViewer",          # profiler + edge-overlap queries
-    "roles/bigquery.jobUser",             # run those queries
+    "roles/bigquery.dataEditor",          # load CSV->raw_<id> on /uploads/complete + audit inserts + profiler/edge reads (hosts the swarm in-process, D5; mirrors orchestrator SA)
+    "roles/bigquery.jobUser",             # run load + query jobs
     "roles/aiplatform.user",              # Gemini via Vertex AI (the chat brain)
   ])
   project = var.project_id
