@@ -39,26 +39,39 @@ function tenantOf(securityContext) {
   return (securityContext && securityContext.tenant_id) || 'default';
 }
 
-function modelPath(tenant) {
-  return `${PREFIX}/${tenant}`;
+// Project workspace (Phase 10). Models are namespaced per project below the
+// tenant. When the security context carries no project_id (legacy clients
+// during the transition), fall back to the tenant-level path.
+function projectOf(securityContext) {
+  return (securityContext && securityContext.project_id) || null;
 }
 
-async function readVersion(tenant) {
+function modelPath(tenant, project) {
+  return project ? `${PREFIX}/${tenant}/${project}` : `${PREFIX}/${tenant}`;
+}
+
+function appId(securityContext) {
+  const t = tenantOf(securityContext);
+  const p = projectOf(securityContext);
+  return p ? `INSNAV_${t}__${p}` : `INSNAV_${t}`;
+}
+
+async function readVersion(tenant, project) {
   if (!BUCKET) return 'no-bucket';
   try {
-    const [buf] = await storage.bucket(BUCKET).file(`${modelPath(tenant)}/__version__`).download();
+    const [buf] = await storage.bucket(BUCKET).file(`${modelPath(tenant, project)}/__version__`).download();
     return buf.toString('utf8').trim() || 'empty';
   } catch (e) {
-    // No model published yet for this tenant — stable sentinel so Cube
-    // compiles an empty model rather than throwing.
+    // No model published yet — stable sentinel so Cube compiles an empty model
+    // rather than throwing.
     return 'empty';
   }
 }
 
-async function readSchemaFiles(tenant) {
+async function readSchemaFiles(tenant, project) {
   if (!BUCKET) return [];
   try {
-    const [files] = await storage.bucket(BUCKET).getFiles({ prefix: `${modelPath(tenant)}/` });
+    const [files] = await storage.bucket(BUCKET).getFiles({ prefix: `${modelPath(tenant, project)}/` });
     const out = [];
     for (const f of files) {
       if (!f.name.endsWith('.js')) continue; // skip __version__ marker
@@ -67,25 +80,27 @@ async function readSchemaFiles(tenant) {
     }
     return out;
   } catch (e) {
-    console.error(`[insnav-cube] failed to read model for tenant=${tenant}:`, e.message);
+    console.error(`[insnav-cube] failed to read model for tenant=${tenant} project=${project}:`, e.message);
     return [];
   }
 }
 
 module.exports = {
-  // Compile a separate model per tenant.
-  contextToAppId: ({ securityContext }) => `INSNAV_${tenantOf(securityContext)}`,
+  // Compile a separate model per (tenant, project).
+  contextToAppId: ({ securityContext }) => appId(securityContext),
 
-  // Recompile when the tenant's published model version changes.
-  schemaVersion: ({ securityContext }) => readVersion(tenantOf(securityContext)),
+  // Recompile when the project's published model version changes.
+  schemaVersion: ({ securityContext }) =>
+    readVersion(tenantOf(securityContext), projectOf(securityContext)),
 
-  // Load the tenant's model files from GCS at compile time.
+  // Load the project's model files from GCS at compile time.
   repositoryFactory: ({ securityContext }) => ({
-    dataSchemaFiles: async () => readSchemaFiles(tenantOf(securityContext)),
+    dataSchemaFiles: async () =>
+      readSchemaFiles(tenantOf(securityContext), projectOf(securityContext)),
   }),
 
-  // Defense in depth: even though models are namespaced per tenant, refuse to
-  // run a query without a tenant in the security context.
+  // Defense in depth: refuse to run a query without a tenant. (project_id is
+  // optional during the transition; the appId namespacing isolates models.)
   queryRewrite: (query, { securityContext }) => {
     if (!securityContext || !securityContext.tenant_id) {
       throw new Error('Missing tenant_id in security context');

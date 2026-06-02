@@ -66,9 +66,14 @@ def approve(
     # join). Re-publish so the deployed Cube container picks it up. Wrapped
     # in try/except — a sync hiccup must not roll back the approval.
     try:
-        from services.api_gateway.app.cube_sync_service import sync_tenant
+        from services.api_gateway.app.cube_sync_service import sync_project, sync_tenant
 
-        sync_tenant(principal.tenant_id)
+        # Re-publish only the affected project's model (Phase 10); legacy edges
+        # with no project fall back to the tenant-level model.
+        if approved.project_id:
+            sync_project(approved.tenant_id, approved.project_id)
+        else:
+            sync_tenant(principal.tenant_id)
     except Exception:  # noqa: BLE001
         logger.exception("cube model sync after approve failed (edge %s)", edge_id)
 

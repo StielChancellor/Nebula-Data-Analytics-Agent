@@ -398,3 +398,68 @@ class TestRoundtripWithComplexSchema:
         js = render_to_js(s)
         assert js.startswith("// Auto-generated")
         assert js.endswith("});\n")
+
+
+class TestConfirmedSemantics:
+    """Phase 10-C: human-confirmed ColumnSemantics override the heuristics."""
+
+    def test_confirmed_revenue_measure(self) -> None:
+        s = build_cube_schema(
+            dataset=_ds(),
+            columns=[
+                _col("city", "STRING", role="dimension"),
+                _col("total_revenue", "NUMERIC", role="measure",
+                     measure_aggregation="sum", is_revenue=True, confirmed_by="a@b.c"),
+            ],
+            edges=[],
+        )
+        measures = {m.name: m for m in s.measures}
+        # exactly one revenue measure (not the blunt sum+avg pair)
+        assert "sum_total_revenue" in measures
+        assert "avg_total_revenue" not in measures
+        assert measures["sum_total_revenue"].revenue_touching is True
+        assert s.revenue_touching() is True
+
+    def test_unconfirmed_revenue_is_not_gated_on(self) -> None:
+        # is_revenue guessed but confirmed_by missing → NOT revenue_touching (PRD #3)
+        s = build_cube_schema(
+            dataset=_ds(),
+            columns=[_col("revenue", "NUMERIC", role="measure",
+                          measure_aggregation="sum", is_revenue=True, confirmed_by=None)],
+            edges=[],
+        )
+        assert s.measures[-1].revenue_touching is False
+        assert s.revenue_touching() is False
+
+    def test_role_ignore_omits_column(self) -> None:
+        s = build_cube_schema(
+            dataset=_ds(),
+            columns=[
+                _col("keep", "STRING", role="dimension"),
+                _col("drop_me", "STRING", role="ignore"),
+            ],
+            edges=[],
+        )
+        dim_names = {d.name for d in s.dimensions}
+        assert "keep" in dim_names
+        assert "drop_me" not in dim_names
+
+    def test_custom_aggregation_and_title(self) -> None:
+        s = build_cube_schema(
+            dataset=_ds(),
+            columns=[_col("score", "FLOAT64", role="measure", measure_aggregation="avg",
+                          display_title="Average Score", confirmed_by="a@b.c")],
+            edges=[],
+        )
+        m = {x.name: x for x in s.measures}["avg_score"]
+        assert m.type == "avg"
+        assert m.title == "Average Score"
+
+    def test_time_role_emits_time_dimension(self) -> None:
+        s = build_cube_schema(
+            dataset=_ds(),
+            columns=[_col("txn_date", "DATE", role="time", date_granularity="day")],
+            edges=[],
+        )
+        d = {x.name: x for x in s.dimensions}["txn_date"]
+        assert d.type == "time"

@@ -48,7 +48,9 @@ def reset_chat_cache() -> None:
 
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
-    # Empty → all of the tenant's ready datasets.
+    # Project workspace to query (Phase 10). None → tenant-wide (legacy).
+    project_id: str | None = None
+    # Empty → all of the project's (or tenant's) ready datasets.
     dataset_ids: list[str] = Field(default_factory=list)
     # Which brain to use (from GET /v1/llm/options). None → the default.
     llm: str | None = None
@@ -70,19 +72,21 @@ async def chat(
 ) -> ChatAnswer:
     settings = get_settings()
     cache_key = compute_inputs_hash(
-        {"t": principal.tenant_id, "q": req.question, "ds": sorted(req.dataset_ids)}
+        {"t": principal.tenant_id, "p": req.project_id or "", "q": req.question,
+         "ds": sorted(req.dataset_ids)}
     )
     cached = _CACHE.get(cache_key)
     if cached is not None:
         return cached
 
-    schemas, health = _catalog_and_health(principal.tenant_id, req.dataset_ids)
+    schemas, health = _catalog_and_health(principal.tenant_id, req.dataset_ids, req.project_id)
 
     llm = build_router(req.llm)
     cube = CubeQueryClient(
         api_url=settings.cube_api_url,
         api_secret=settings.cube_api_secret,
         offline=settings.offline_mode or not settings.cube_api_url,
+        project_id=req.project_id,
     )
 
     answer = await answer_question(
@@ -106,14 +110,19 @@ async def chat(
     return answer
 
 
-def _catalog_and_health(tenant_id: str, dataset_ids: list[str]):
-    datasets = [d for d in list_datasets_for_tenant(tenant_id) if d.status == "ready"]
+def _catalog_and_health(tenant_id: str, dataset_ids: list[str], project_id: str | None = None):
+    if project_id:
+        from services.api_gateway.app.datasets import list_datasets_for_project
+
+        datasets = [d for d in list_datasets_for_project(tenant_id, project_id) if d.status == "ready"]
+    else:
+        datasets = [d for d in list_datasets_for_tenant(tenant_id) if d.status == "ready"]
     if dataset_ids:
         wanted = set(dataset_ids)
         datasets = [d for d in datasets if d.id in wanted]
 
     columns_by_dataset = {d.id: get_column_profiles(d.id) for d in datasets}
-    edges = [e.model_dump() for e in list_approved_edges(tenant_id)]
+    edges = [e.model_dump() for e in list_approved_edges(tenant_id, project_id)]
     schemas = build_tenant_schemas(
         datasets=[d.model_dump() for d in datasets],
         columns_by_dataset=columns_by_dataset,
