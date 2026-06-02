@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiClient,
+  type CostEstimate,
   type Dashboard,
   type PivotField,
   type PivotFields,
@@ -34,6 +35,8 @@ export function PivotView({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"table" | "chart">("table");
+  const [estimate, setEstimate] = useState<CostEstimate | null>(null);
+  const [snapMsg, setSnapMsg] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -47,17 +50,21 @@ export function PivotView({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (values.length === 0 && rows.length === 0 && cols.length === 0) {
       setResult(null);
+      setEstimate(null);
       return;
     }
     if (debounce.current) clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
       setBusy(true);
       setError(null);
+      const req = { project_id: projectId, measures: values, dimensions: [...rows, ...cols] };
       client
-        .pivotQuery({ project_id: projectId, measures: values, dimensions: [...rows, ...cols] })
+        .pivotQuery(req)
         .then(setResult)
         .catch((e) => setError(e instanceof Error ? e.message : String(e)))
         .finally(() => setBusy(false));
+      // Cost preview (Phase 11 #4) — runs in parallel; never blocks the result.
+      client.estimateCost(req).then(setEstimate).catch(() => setEstimate(null));
     }, 400);
   }, [client, projectId, rows, cols, values]);
 
@@ -86,6 +93,38 @@ export function PivotView({ projectId }: { projectId: string }) {
     () => (result ? buildCrosstab(result, rows, cols, values) : null),
     [result, rows, cols, values],
   );
+
+  const specTitle =
+    `${values.map(short).join(", ") || "count"}` +
+    (rows.length || cols.length ? ` by ${[...rows, ...cols].map(short).join(", ")}` : "");
+
+  const downloadNotebook = async () => {
+    try {
+      const nb = await client.exportNotebook({
+        project_id: projectId, title: specTitle,
+        measures: values, dimensions: [...rows, ...cols],
+      });
+      const blob = new Blob([JSON.stringify(nb, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${specTitle.replace(/[^a-z0-9]+/gi, "_").slice(0, 40) || "export"}.ipynb`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const captureSnapshot = async () => {
+    try {
+      await client.captureSnapshot(projectId, { measures: values, dimensions: [...rows, ...cols] }, specTitle);
+      setSnapMsg("Snapshot captured ✓");
+      setTimeout(() => setSnapMsg(null), 2500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   return (
     <section className="space-y-4">
@@ -122,19 +161,38 @@ export function PivotView({ projectId }: { projectId: string }) {
             <ShelfBox label="Values" items={values} onDrop={onDrop} which="values" onRemove={removeFrom} />
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] text-ink-300">{busy ? "Computing…" : grid ? `${grid.body.length} rows` : ""}</div>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-[11px] text-ink-300">
+              <span>{busy ? "Computing…" : grid ? `${grid.body.length} rows` : ""}</span>
+              {estimate && <CostBadge estimate={estimate} />}
+              {snapMsg && <span className="text-emerald-300">{snapMsg}</span>}
+            </div>
             <div className="flex items-center gap-2">
               {grid && (
                 <PinToDashboard
                   client={client}
                   projectId={projectId}
                   spec={{ measures: values, dimensions: [...rows, ...cols], chart_type: "auto" }}
-                  title={
-                    `${values.map(short).join(", ") || "count"}` +
-                    (rows.length || cols.length ? ` by ${[...rows, ...cols].map(short).join(", ")}` : "")
-                  }
+                  title={specTitle}
                 />
+              )}
+              {grid && (
+                <button
+                  onClick={captureSnapshot}
+                  className="text-[11px] px-2 py-1 rounded border border-ink-700/60 text-ink-200 hover:bg-ink-700/40"
+                  title="Capture this result for later diffing"
+                >
+                  Snapshot
+                </button>
+              )}
+              {grid && (
+                <button
+                  onClick={downloadNotebook}
+                  className="text-[11px] px-2 py-1 rounded border border-ink-700/60 text-ink-200 hover:bg-ink-700/40"
+                  title="Download a reproducible Jupyter notebook (.ipynb)"
+                >
+                  Notebook
+                </button>
               )}
               {grid && (
                 <button
@@ -171,6 +229,26 @@ export function PivotView({ projectId }: { projectId: string }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function CostBadge({ estimate }: { estimate: CostEstimate }) {
+  const gb = estimate.estimated_gb;
+  const label = gb >= 1 ? `${gb.toFixed(2)} GB` : `${(gb * 1024).toFixed(1)} MB`;
+  const warn = estimate.exceeds_threshold;
+  return (
+    <span
+      title={`Estimated scan ~${label} (~$${estimate.estimated_usd.toFixed(4)}). ${estimate.method}.${
+        warn ? ` Exceeds ${estimate.threshold_gb} GB — consider narrowing.` : ""
+      }`}
+      className={`px-1.5 py-0.5 rounded border text-[10px] font-mono ${
+        warn
+          ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
+          : "bg-ink-700/40 text-ink-300 border-ink-600/40"
+      }`}
+    >
+      {warn ? "⚠ " : "≈ "}{label}
+    </span>
   );
 }
 

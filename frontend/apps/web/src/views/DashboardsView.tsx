@@ -2,7 +2,12 @@
  * Dashboards (Phase 8) — pinned tiles that re-run on visit + read-only share.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApiClient, type Dashboard, type DashboardRun } from "@insnav/api-client";
+import {
+  ApiClient,
+  type Dashboard,
+  type DashboardRun,
+  type AssumptionWarning,
+} from "@insnav/api-client";
 import { useAuth } from "@insnav/auth";
 import { SmartChart } from "./SmartChart";
 
@@ -38,7 +43,14 @@ export function DashboardsView({ projectId }: { projectId: string }) {
   };
 
   if (openId) {
-    return <DashboardDetail client={client} id={openId} onBack={() => { setOpenId(null); refresh(); }} />;
+    return (
+      <DashboardDetail
+        client={client}
+        id={openId}
+        projectId={projectId}
+        onBack={() => { setOpenId(null); refresh(); }}
+      />
+    );
   }
 
   return (
@@ -88,17 +100,50 @@ export function DashboardsView({ projectId }: { projectId: string }) {
   );
 }
 
-function DashboardDetail({ client, id, onBack }: { client: ApiClient; id: string; onBack: () => void }) {
+function DashboardDetail({
+  client,
+  id,
+  projectId,
+  onBack,
+}: {
+  client: ApiClient;
+  id: string;
+  projectId: string;
+  onBack: () => void;
+}) {
   const [run, setRun] = useState<DashboardRun | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [assumptions, setAssumptions] = useState<Record<string, AssumptionWarning[]>>({});
+  const [checking, setChecking] = useState(false);
 
   const load = useCallback(() => {
     setBusy(true);
+    setAssumptions({});
     client.runDashboard(id).then(setRun).catch((e) => setError(String(e))).finally(() => setBusy(false));
   }, [client, id]);
   useEffect(load, [load]);
+
+  // Phase 11 #5: re-check each tile's statistical assumptions on demand.
+  const checkAssumptions = async () => {
+    if (!run) return;
+    setChecking(true);
+    const out: Record<string, AssumptionWarning[]> = {};
+    await Promise.all(
+      run.tiles.map(async (t) => {
+        if (t.error) return;
+        try {
+          const rep = await client.checkAssumptions(projectId, t.spec);
+          if (rep.warnings.length) out[t.tile_id] = rep.warnings;
+        } catch {
+          /* ignore per-tile */
+        }
+      }),
+    );
+    setAssumptions(out);
+    setChecking(false);
+  };
 
   const share = async () => {
     try {
@@ -128,6 +173,9 @@ function DashboardDetail({ client, id, onBack }: { client: ApiClient; id: string
         </div>
         <div className="flex items-center gap-2">
           <button onClick={load} className="text-[12px] px-3 py-1.5 rounded border border-ink-700/60 hover:bg-ink-700/40">Refresh</button>
+          <button onClick={checkAssumptions} disabled={checking || !run} className="text-[12px] px-3 py-1.5 rounded border border-ink-700/60 hover:bg-ink-700/40 disabled:opacity-50" title="Re-check each tile's statistical assumptions">
+            {checking ? "Checking…" : "Check assumptions"}
+          </button>
           <button onClick={share} className="text-[12px] px-3 py-1.5 rounded border border-ink-700/60 hover:bg-ink-700/40">Share link</button>
         </div>
       </div>
@@ -153,6 +201,23 @@ function DashboardDetail({ client, id, onBack }: { client: ApiClient; id: string
                 <div className="text-[12px] font-medium text-ink-100">{t.title}</div>
                 <button onClick={() => removeTile(t.tile_id)} aria-label="Remove tile" className="text-[11px] text-ink-300 hover:text-red-300">×</button>
               </div>
+              {(assumptions[t.tile_id] ?? []).length > 0 && (
+                <div className="mb-2 space-y-1">
+                  {assumptions[t.tile_id]!.map((w, i) => (
+                    <div
+                      key={i}
+                      className={`text-[10px] px-2 py-1 rounded border flex items-start gap-1 ${
+                        w.level === "warn"
+                          ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                          : "bg-ink-700/40 text-ink-300 border-ink-600/40"
+                      }`}
+                    >
+                      <span>{w.level === "warn" ? "⚠" : "ℹ"}</span>
+                      <span>{w.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {t.error ? (
                 <div className="text-[11px] text-amber-300">{t.error}</div>
               ) : (

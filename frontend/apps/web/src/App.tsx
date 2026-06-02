@@ -20,6 +20,9 @@ import { OnboardingView } from "./views/OnboardingView";
 import { PivotView } from "./views/PivotView";
 import { DashboardsView } from "./views/DashboardsView";
 import { PublicDashboard } from "./views/PublicDashboard";
+import { MetricsView } from "./views/MetricsView";
+import { CohortsView } from "./views/CohortsView";
+import { SnapshotsView } from "./views/SnapshotsView";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
@@ -173,7 +176,7 @@ function AccountMenu() {
 
 // ---------- Admin: a single project's workspace ----------
 
-type WorkspaceTab = "datasets" | "onboarding" | "graph" | "cube" | "settings";
+type WorkspaceTab = "datasets" | "onboarding" | "graph" | "cube" | "metrics" | "settings";
 
 function ProjectWorkspace({ project, onBack }: { project: Project; onBack: () => void }) {
   const [tab, setTab] = useState<WorkspaceTab>("datasets");
@@ -184,6 +187,7 @@ function ProjectWorkspace({ project, onBack }: { project: Project; onBack: () =>
     { id: "onboarding", label: "Onboarding" },
     { id: "graph", label: "Graph" },
     { id: "cube", label: "Cube" },
+    { id: "metrics", label: "Metrics" },
     { id: "settings", label: "Settings" },
   ];
 
@@ -242,6 +246,7 @@ function ProjectWorkspace({ project, onBack }: { project: Project; onBack: () =>
       )}
       {tab === "graph" && <GraphView projectId={project.id} />}
       {tab === "cube" && <CubeView projectId={project.id} />}
+      {tab === "metrics" && <MetricsView projectId={project.id} />}
       {tab === "settings" && <ProjectSettings project={project} onChanged={onBack} />}
     </div>
   );
@@ -370,7 +375,7 @@ function ProjectSettings({ project, onChanged }: { project: Project; onChanged: 
 
 // ---------- Explore: consume a project ----------
 
-type ExploreTab = "ask" | "pivots" | "dashboards";
+type ExploreTab = "ask" | "pivots" | "dashboards" | "cohorts" | "snapshots";
 
 function ExploreSurface({ project }: { project: Project | null }) {
   const [tab, setTab] = useState<ExploreTab>("ask");
@@ -385,7 +390,7 @@ function ExploreSurface({ project }: { project: Project | null }) {
     <div className="space-y-5">
       <div className="flex items-center justify-end">
         <div className="flex items-center rounded-md border border-ink-700/60 overflow-hidden text-[12px]">
-          {(["ask", "pivots", "dashboards"] as ExploreTab[]).map((t) => (
+          {(["ask", "pivots", "dashboards", "cohorts", "snapshots"] as ExploreTab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -402,15 +407,8 @@ function ExploreSurface({ project }: { project: Project | null }) {
       {tab === "ask" && <ChatView projectId={project.id} />}
       {tab === "pivots" && <PivotView projectId={project.id} />}
       {tab === "dashboards" && <DashboardsView projectId={project.id} />}
-    </div>
-  );
-}
-
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <div className="text-[13px] text-ink-300 border border-dashed border-ink-700/60 rounded-lg p-10 bg-ink-800/20 text-center">
-      <div className="text-2xl text-ink-300 mb-2">▦</div>
-      {label} — coming next (PRD Phase 7/8). Your governed cube already powers <span className="text-ink-100">Ask</span>.
+      {tab === "cohorts" && <CohortsView projectId={project.id} />}
+      {tab === "snapshots" && <SnapshotsView projectId={project.id} />}
     </div>
   );
 }
